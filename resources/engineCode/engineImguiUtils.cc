@@ -34,7 +34,6 @@ void engine::HelpMarker( const char *desc ) {
 	}
 }
 
-
 void engine::drawTextEditor() {
 	ImGui::Begin( "Editor", NULL, 0 );
 	static TextEditor editor;
@@ -74,9 +73,9 @@ void engine::imguiFrameStart() {
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplSDL2_NewFrame( window );
 	ImGui::NewFrame();
-	}
+}
 
-	void engine::imguiFrameEnd() {
+void engine::imguiFrameEnd() {
 	// get it ready to put on the screen
 	ImGui::Render();
 

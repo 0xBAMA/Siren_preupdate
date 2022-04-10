@@ -63,6 +63,7 @@ void engine::pathtraceUniformUpdate() {
 	// float lensThickness;    // offset between the two spheres
 	// float lensRotate;       // rotating the displacement offset betwee spheres
 	// float lensIOR;          // index of refraction for the lens
+	// int lensNormalMethod;	 // should this just be picked as constant?
 }
 
 void engine::pathtrace() {
@@ -228,11 +229,9 @@ void engine::imguiPass() {
 		ImGui::EndTabBar();
 	}
 
-    cout << "tab bar completed" << endl << std::flush;
-
 	// performance monitoring
-	static float tileValues[ PERFORMANCEHISTORY ] = {};
-	static float fpsValues[ PERFORMANCEHISTORY ] = {};
+	float tileValues[ PERFORMANCEHISTORY ] = {};
+	float fpsValues[ PERFORMANCEHISTORY ] = {};
 	float tileAverage = 0;
 	float fpsAverage = 0;
 	for ( int n = 0; n < PERFORMANCEHISTORY; n++ ) {
@@ -247,8 +246,6 @@ void engine::imguiPass() {
 	sprintf( tileOverlay, "avg %.2f tiles/update (%.2f ms/tile)", tileAverage, ( 1000.0f / fpsAverage ) / tileAverage );
 	sprintf( fpsOverlay, "avg %.2f fps (%.2f ms)", fpsAverage, 1000.0f / fpsAverage );
 
-    cout << "sprintfs completed" << endl << std::flush;    
-
 	// absolute positioning within the window
 	ImGui::SetCursorPosY( ImGui::GetWindowSize().y - 200 );
 	ImGui::Text(" Performance Monitor");
@@ -259,15 +256,13 @@ void engine::imguiPass() {
 	ImGui::SetCursorPosX( 15 );
 
 	// graph of tiles per frame, for the past $PERFORMANCEHISTORY frames
-	ImGui::PlotLines( "", tileValues, IM_ARRAYSIZE( tileValues ), 0, tileOverlay, -10.0f, float( host.tilePerFrameCap ) + 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
+	ImGui::PlotLines( " ", tileValues, IM_ARRAYSIZE( tileValues ), 0, tileOverlay, -10.0f, float( host.tilePerFrameCap ) + 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
 	ImGui::Text("  FPS History");
 
 	// graph of time per frame, for the last $PERFORMANCEHISTORY frames
 		// should stay flat (tm) at 60fps, given the structure of the pathtracing function ( abort on t >= 60fps equivalent )
 	ImGui::SetCursorPosX( 15 );
-	ImGui::PlotLines( "", fpsValues, IM_ARRAYSIZE( fpsValues ), 0, fpsOverlay, -10.0f, 200.0f, ImVec2(  ImGui::GetWindowSize().x - 30, 65 ) );
-
-
+	ImGui::PlotLines( " ", fpsValues, IM_ARRAYSIZE( fpsValues ), 0, fpsOverlay, -10.0f, 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
 
 	// finished with the settings window
 	ImGui::End();
