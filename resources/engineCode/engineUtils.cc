@@ -240,7 +240,7 @@ void engine::imguiPass() {
 	char tileOverlay[ 45 ];
 	char fpsOverlay[ 32 ];
 
-	sprintf( tileOverlay, "avg %.2f tiles/sec (%.2f ms/tile)", tileAverage, ( 1000.0f / fpsAverage ) / tileAverage );
+	sprintf( tileOverlay, "avg %.2f tiles/update (%.2f ms/tile)", tileAverage, ( 1000.0f / fpsAverage ) / tileAverage );
 	sprintf( fpsOverlay, "avg %.2f fps (%.2f ms)", fpsAverage, 1000.0f / fpsAverage );
 
 	// absolute positioning within the window
