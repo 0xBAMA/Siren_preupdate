@@ -87,13 +87,13 @@ constexpr int MSAACount = 1;
 #include "../JSON/json.hpp"
 using json = nlohmann::json;
 
-// #define WIDTH 640
-// #define HEIGHT 480
+#define WIDTH 640
+#define HEIGHT 480
 
-#define WIDTH  1920 / 3
-#define HEIGHT 1080 / 3
+// #define WIDTH  1920 / 3
+// #define HEIGHT 1080 / 3
 
-#define PERFORMANCEHISTORY 300
+#define PERFORMANCEHISTORY 200
 
 // not sure about this, going to need to do some testing, to maximize amount of work per timer query
 #define TILESIZE 16
@@ -112,9 +112,9 @@ struct coreParameters {
 	int maxBounces = 10;
 	float maxDistance = 15.0;
 	float epsilon = 0.001;
-	float exposure = 0.11;
+	float exposure = 0.98;
 	float focusDistance = 10.0;
-	int normalMethod = 0;
+	int normalMethod = 1;
 	float FoV = 0.152;
 	glm::vec3 viewerPosition = glm::vec3( 10.0, 9.258, 7.562 );
 	float rotationAboutX = 1.541;

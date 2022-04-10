@@ -145,7 +145,8 @@ void engine::resetAccumulator() {
 	glActiveTexture( GL_TEXTURE0 + 1 );
 	glBindTexture( GL_TEXTURE_2D, accumulatorTexture );
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageData[ 0 ] );
-	cout << "Reset buffer" << endl;
+	glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
+	cout << "Accumulator Buffer has been reinitialized" << endl;
 }
 
 void engine::imguiPass() {
@@ -295,42 +296,49 @@ void engine::handleEvents() {
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r )
 			resetAccumulator();
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w )
 			core.rotationAboutX -= SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s )
 			core.rotationAboutX += SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a )
 			core.rotationAboutY -= SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d )
 			core.rotationAboutY += SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e )
 			core.rotationAboutZ -= SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q )
 			core.rotationAboutZ += SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
 
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP )
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisZ;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_DOWN)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_DOWN )
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisZ;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RIGHT)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RIGHT )
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisX;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_LEFT)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_LEFT )
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisX;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEUP)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEUP )
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisY;
 
-		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEDOWN)
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEDOWN )
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisY;
+
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_f ) {
+			core.viewerPosition = glm::vec3( 0.0, 0.0, 0.0 );
+			core.rotationAboutX = 0.0;
+			core.rotationAboutY = 0.0;
+			core.rotationAboutZ = 0.0;
+		}
 
 
 	}
