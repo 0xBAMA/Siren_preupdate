@@ -225,6 +225,7 @@ void engine::imguiPass() {
 			ImGui::SliderFloat( "Fog Depth Scalar", &post.depthScale, 0.01, 10.0 );
 			ImGui::EndTabItem();
 		}
+		ImGui::EndTabBar();
 	}
 
 
@@ -239,8 +240,8 @@ void engine::imguiPass() {
 	}
 	tileAverage /= float( PERFORMANCEHISTORY );
 	fpsAverage /= float( PERFORMANCEHISTORY );
-	char tileOverlay[ 45 ];
-	char fpsOverlay[ 32 ];
+	char tileOverlay[ 100 ];
+	char fpsOverlay[ 45 ];
 
 	sprintf( tileOverlay, "avg %.2f tiles/update (%.2f ms/tile)", tileAverage, ( 1000.0f / fpsAverage ) / tileAverage );
 	sprintf( fpsOverlay, "avg %.2f fps (%.2f ms)", fpsAverage, 1000.0f / fpsAverage );
