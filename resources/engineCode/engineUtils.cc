@@ -1,0 +1,340 @@
+#include "engine.h"
+
+bool engine::mainLoop() {
+	render();											// render with the current mode
+	postprocess( );								// accumulatorTexture -> displayTexture
+	mainDisplayBlit();						// fullscreen triangle copying the image
+	imguiPass();									// do all the GUI stuff
+	SDL_GL_SwapWindow( window );	// swap the double buffers to present
+	handleEvents();								// handle input events
+	return !pQuit;								// break loop in main.cc when pQuit becomes true
+}
+
+void engine::render() {
+	// different rendering modes - preview until pathtrace is triggered
+	switch ( mode ) {
+		case renderMode::preview:   raymarch();  break;
+		case renderMode::pathtrace: pathtrace(); break;
+		default: break;
+	}
+}
+
+void engine::raymarch() {
+	glUseProgram( raymarchShader );
+	// do a fullscreen pass with simple shading, flag to prevent unncessesary further update
+
+	// send associated uniforms
+
+	// not sure if I actually want to include this as a feature, but that may be laziness talking
+		// will revisit once the pathtracing logic is implemented
+}
+
+void engine::pathtraceUniformUpdate() {
+
+	glUniform2i( glGetUniformLocation( pathtraceShader, "noiseOffset" ), core.noiseOffset.x, core.noiseOffset.y );
+	glUniform1i( glGetUniformLocation( pathtraceShader, "maxSteps" ), core.maxSteps );
+	glUniform1i( glGetUniformLocation( pathtraceShader, "maxBounces" ), core.maxBounces );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "maxDistance" ), core.maxDistance );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "epsilon" ), core.epsilon );
+	glUniform1i( glGetUniformLocation( pathtraceShader, "normalMethod" ), core.normalMethod );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "focusDistance" ), core.focusDistance );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "FoV" ), core.FoV );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "exposure" ), core.exposure );
+	glUniform3f( glGetUniformLocation( pathtraceShader, "viewerPosition" ), core.viewerPosition.x, core.viewerPosition.y, core.viewerPosition.z );
+
+	// construct basis vectors from rotations
+	glm::quat rotationx = glm::angleAxis( core.rotationAboutX, glm::vec3( 1, 0, 0 ) );
+	glm::quat rotationy = glm::angleAxis( core.rotationAboutY, glm::vec3( 0, 1, 0 ) );
+	glm::quat rotationz = glm::angleAxis( core.rotationAboutZ, glm::vec3( 0, 0, 1 ) );
+	glm::mat4 rotation = glm::toMat4( rotationy * rotationx * rotationz );
+	core.basisX = ( rotation * glm::vec4( 1, 0, 0, 0 ) ).xyz();
+	core.basisY = ( rotation * glm::vec4( 0, 1, 0, 0 ) ).xyz();
+	core.basisZ = ( rotation * glm::vec4( 0, 0, 1, 0 ) ).xyz();
+
+	glUniform3f( glGetUniformLocation( pathtraceShader, "basisX"), core.basisX.x, core.basisX.y, core.basisX.z );
+	glUniform3f( glGetUniformLocation( pathtraceShader, "basisY"), core.basisY.x, core.basisY.y, core.basisY.z );
+	glUniform3f( glGetUniformLocation( pathtraceShader, "basisZ"), core.basisZ.x, core.basisZ.y, core.basisZ.z );
+
+// TBD, not priority right now
+	// // lens parameters
+	// float lensScaleFactor;  // scales the lens DE
+	// float lensRadius1;      // radius of the sphere for the first side
+	// float lensRadius2;      // radius of the sphere for the second side
+	// float lensThickness;    // offset between the two spheres
+	// float lensRotate;       // rotating the displacement offset betwee spheres
+	// float lensIOR;          // index of refraction for the lens
+}
+
+void engine::pathtrace() {
+	glUseProgram( pathtraceShader );
+
+	// send the uniforms
+	pathtraceUniformUpdate();
+
+	GLuint64 startTime, checkTime;
+	GLuint queryID[ 2 ];
+	glGenQueries( 2, queryID );
+	glQueryCounter( queryID[ 0 ], GL_TIMESTAMP );
+
+	// get startTime
+	GLint startTimeAvailable = 0;
+	while( !startTimeAvailable )
+	glGetQueryObjectiv( queryID[ 0 ], GL_QUERY_RESULT_AVAILABLE, &startTimeAvailable );
+	glGetQueryObjectui64v( queryID[ 0 ], GL_QUERY_RESULT, &startTime );
+
+	int tilesCompleted = 0;
+	float looptime = 0.;
+	while( 1 ) {
+		// get a tile offset + send it
+		glm::ivec2 tile = getTile();
+		glUniform2i( glGetUniformLocation( pathtraceShader, "tileOffset" ), tile.x, tile.y );
+
+		// render the specified tile - dispatch
+		glDispatchCompute( TILESIZE / 32, TILESIZE / 32, 1 );
+		glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
+		tilesCompleted++;
+
+		// check time, wait for query to be ready
+		glQueryCounter( queryID[ 1 ], GL_TIMESTAMP );
+		GLint checkTimeAvailable = 0;
+		while( !checkTimeAvailable )
+			glGetQueryObjectiv( queryID[ 1 ], GL_QUERY_RESULT_AVAILABLE, &checkTimeAvailable );
+		glGetQueryObjectui64v( queryID[ 1 ], GL_QUERY_RESULT, &checkTime );
+
+		// break if duration exceeds 16 ms ( 60fps + a small margin ) - query units are nanoseconds
+		looptime = ( checkTime - startTime ) / 1e6; // get milliseconds
+		if( looptime > ( 16.0f ) || tilesCompleted >= host.tilePerFrameCap ) {
+			// cout << tilesCompleted << " tiles in " << looptime << " ms, avg " << looptime / tilesCompleted << " ms/tile" << endl;
+			break;
+		}
+	}
+	fpsHistory.push_back( 1000.0f / looptime );
+	fpsHistory.pop_front();
+
+	tileHistory.push_back( tilesCompleted );
+	tileHistory.pop_front();
+}
+
+void engine::postprocess() {
+	// tonemapping and dithering, as configured in the GUI
+	glUseProgram( postprocessShader );
+
+	// send associated uniforms
+
+	glDispatchCompute( std::ceil( WIDTH / 32. ), std::ceil( HEIGHT / 32. ), 1 );
+	glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT ); // sync
+}
+
+void engine::mainDisplayBlit() {
+	// clear the screen
+	glClearColor( clearColor.x, clearColor.y, clearColor.z, clearColor.w );
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+	// texture display
+	glUseProgram( displayShader );
+	glBindVertexArray( displayVAO );
+
+	ImGuiIO &io = ImGui::GetIO();
+	glUniform2f( glGetUniformLocation( displayShader, "resolution" ), io.DisplaySize.x, io.DisplaySize.y );
+	glDrawArrays( GL_TRIANGLES, 0, 3 );
+}
+
+void engine::resetAccumulator() {
+	std::vector< unsigned char > imageData;
+	imageData.resize( WIDTH * HEIGHT * 4, 0 );
+	glActiveTexture( GL_TEXTURE0 + 1 );
+	glBindTexture( GL_TEXTURE_2D, accumulatorTexture );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageData[ 0 ] );
+	cout << "Reset buffer" << endl;
+}
+
+void engine::imguiPass() {
+	// start the imgui frame
+	imguiFrameStart();
+
+	// show the demo window
+	static bool showDemoWindow = !true;
+	if ( showDemoWindow ) {
+		ImGui::ShowDemoWindow( &showDemoWindow );
+	}
+
+	// show quit confirm window
+	quitConf( &quitConfirm );
+
+	// Tabbed window for the controls categories of parameters
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar;
+	ImGui::Begin( "Settings", NULL, flags );
+
+	ImGui::Text(" Parameters ");
+	if ( ImGui::BeginTabBar( "Config Sections", ImGuiTabBarFlags_None ) ) {
+		if ( ImGui::BeginTabItem( " Host " ) ) {
+			ImGui::SliderInt( "Screenshot Width", &host.screenshotDim, 1000, maxTextureSizeCheck );
+			ImGui::SliderInt( "Screenshot Samples", &host.numSamplesScreenshot, 1, 512 );
+			ImGui::Separator();
+			ImGui::SliderInt( "Tile Per Frame Cap", &host.tilePerFrameCap, 1, 3000 );
+
+			// what else?
+			// buttons, controls for the renderer state
+				// trigger random tile glitch behaviors
+				// RESET button - zero sample count for all tiles ( + keyboard shortcut to do this as well )
+
+			ImGui::EndTabItem();
+		}
+		if ( ImGui::BeginTabItem( " Core " ) ) {
+			// core renderer parameters
+			ImGui::SliderInt( "Max Raymarch Steps", &core.maxSteps, 1, 500 );
+			ImGui::SliderInt( "Max Light Bounces", &core.maxBounces, 1, 50 );
+			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0, 100.0 );
+			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001, 0.1 );
+			ImGui::Separator();
+			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1, 3.6 );
+			ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0, 100.0 );
+			ImGui::Separator();
+			ImGui::SliderInt( "SDF Normal Method", &core.normalMethod, 1, 3 );
+			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01, 0.9 );
+			ImGui::Separator();
+			ImGui::SliderFloat( "Viewer X", &core.viewerPosition.x, -20.0, 20.0 );
+			ImGui::SliderFloat( "Viewer Y", &core.viewerPosition.y, -20.0, 20.0 );
+			ImGui::SliderFloat( "Viewer Z", &core.viewerPosition.z, -20.0, 20.0 );
+			ImGui::SliderFloat( "Rotation X", &core.rotationAboutX, -4.0, 4.0 );
+			ImGui::SliderFloat( "Rotation Y", &core.rotationAboutY, -4.0, 4.0 );
+			ImGui::SliderFloat( "Rotation Z", &core.rotationAboutZ, -4.0, 4.0 );
+			ImGui::EndTabItem();
+		}
+		if ( ImGui::BeginTabItem( " Lens " ) ) {
+			// lens geometry parameters
+			ImGui::SliderFloat( "Lens Scale Factor", &lens.lensScaleFactor, 0.1, 10.0 );
+			ImGui::SliderFloat( "Lens Radius 1", &lens.lensRadius1, 0.01, 10.0 );
+			ImGui::SliderFloat( "Lens Radius 2", &lens.lensRadius2, 0.01, 10.0 );
+			ImGui::SliderFloat( "Lens Thickness", &lens.lensThickness, 0.01, 10.0 );
+			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -4.0, 4.0 );
+			ImGui::SliderFloat( "Lens IOR", &lens.lensIOR, 0.0, 2.0 );
+			ImGui::EndTabItem();
+		}
+		if ( ImGui::BeginTabItem( " Post " ) ) {
+			// postprocessing parameters
+			ImGui::SliderInt( "Dither Mode", &post.ditherMode, 0, 10 ); // however many there are - maybe use a dropdown for this
+			ImGui::SliderInt( "Dither Method", &post.ditherMethod, 0, 10 ); // however many there are - maybe use a dropdown for this
+			ImGui::SliderInt( "Dither Pattern", &post.ditherPattern, 0, 10 ); // however many there are - maybe use a dropdown for this
+			ImGui::Separator();
+			ImGui::SliderInt( "Tonemap Mode", &post.tonemapMode, 0, 8 ); // whatever the range ends up being
+			ImGui::Separator();
+			ImGui::SliderInt( "Depth Fog Mode", &post.depthMode, 0, 8 ); // whatever the range ends up being
+			ImGui::SliderFloat( "Fog Depth Scalar", &post.depthScale, 0.01, 10.0 );
+			ImGui::EndTabItem();
+		}
+	}
+
+
+	// performance monitoring
+	static float tileValues[ PERFORMANCEHISTORY ] = {};
+	static float fpsValues[ PERFORMANCEHISTORY ] = {};
+	float tileAverage = 0;
+	float fpsAverage = 0;
+	for ( int n = 0; n < PERFORMANCEHISTORY; n++ ) {
+		tileAverage += tileValues[ n ] = tileHistory[ n ];
+		fpsAverage += fpsValues[ n ] = fpsHistory[ n ];
+	}
+	tileAverage /= float( PERFORMANCEHISTORY );
+	fpsAverage /= float( PERFORMANCEHISTORY );
+	char tileOverlay[ 45 ];
+	char fpsOverlay[ 32 ];
+
+	sprintf( tileOverlay, "avg %.2f tiles/sec (%.2f ms/tile)", tileAverage, ( 1000.0f / fpsAverage ) / tileAverage );
+	sprintf( fpsOverlay, "avg %.2f fps (%.2f ms)", fpsAverage, 1000.0f / fpsAverage );
+
+	// absolute positioning within the window
+	ImGui::SetCursorPosY( ImGui::GetWindowSize().y - 200 );
+	ImGui::Text(" Performance Monitor");
+	ImGui::SameLine();
+	HelpMarker("Tiles are processed asynchronously to the frame update. This means that an arbitrary number of tiles may be processed in the space between frames, depending on hardware capabilities and the shader complexity, as configured. The program is designed to maintain ~60fps for responsiveness, regardless of what this hardware capability may be ( up to the point where the execution time of a single tile exceeds the total alotted frame time of 16ms ).");
+	ImGui::Separator();
+	ImGui::Text("  Tile History");
+	ImGui::SetCursorPosX( 15 );
+
+	// graph of tiles per frame, for the past $PERFORMANCEHISTORY frames
+	ImGui::PlotLines( "", tileValues, IM_ARRAYSIZE( tileValues ), 0, tileOverlay, -10.0f, float( host.tilePerFrameCap ) + 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
+	ImGui::Text("  FPS History");
+
+	// graph of time per frame, for the last $PERFORMANCEHISTORY frames
+		// should stay flat (tm) at 60fps, given the structure of the pathtracing function ( abort on t >= 60fps equivalent )
+	ImGui::SetCursorPosX( 15 );
+	ImGui::PlotLines( "", fpsValues, IM_ARRAYSIZE( fpsValues ), 0, fpsOverlay, -10.0f, 200.0f, ImVec2(  ImGui::GetWindowSize().x - 30, 65 ) );
+
+
+
+	// finished with the settings window
+	ImGui::End();
+
+	// finish up the imgui stuff and put it in the framebuffer
+	imguiFrameEnd();
+}
+
+void engine::handleEvents() {
+	SDL_Event event;
+	while ( SDL_PollEvent( &event ) ) {
+		// imgui event handling
+		ImGui_ImplSDL2_ProcessEvent( &event );
+
+		if ( event.type == SDL_QUIT )
+			pQuit = true;
+
+		if ( event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID( window ) )
+			pQuit = true;
+
+		if ( ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE) || ( event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_X1 ) )
+			quitConfirm = !quitConfirm; // x1 is browser back on the mouse
+
+		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE && SDL_GetModState() & KMOD_SHIFT )
+			pQuit = true; // force quit on shift+esc ( bypasses confirm window )
+
+		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
+			screenShot();
+
+		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r )
+			resetAccumulator();
+	}
+}
+
+glm::ivec2 engine::getTile() {
+	static std::vector< glm::ivec2 > offsets;
+	static int listOffset = 0;
+	static bool firstTime = true;
+	std::random_device rd;
+	std::mt19937 rngen( rd() );
+
+	if ( firstTime ) { // construct the tile list
+		firstTime = false;
+		for( int x = 0; x <= WIDTH; x += TILESIZE ) {
+			for( int y = 0; y <= HEIGHT; y += TILESIZE ) {
+				offsets.push_back( glm::ivec2( x, y ) );
+			}
+		}
+	} else { // check if the offset needs to be reset
+		if ( ++listOffset == int( offsets.size() ) ) {
+			listOffset = 0;
+		}
+	}
+	// shuffle when listOffset is zero ( first iteration, and any subsequent resets )
+	if ( !listOffset ) std::shuffle( offsets.begin(), offsets.end(), rngen );
+	return offsets[ listOffset ];
+}
+
+
+// this is going to be a situation where we go from the regular render target, to a new render target, of some configured dimensions, up to what is supported by the driver
+const int result( int& val ){ glGetIntegerv( GL_MAX_TEXTURE_SIZE, &val ); return val; }
+void engine::screenShot() {
+	GLint val;
+	static const int maxTextureSize = result( val );
+	cout << "Max texture dimension: " << val << endl;
+
+	// set to max of screenshotDim and maximum value
+	host.screenshotDim = std::min( maxTextureSize, host.screenshotDim );
+
+	cout << "Capturing at " << host.screenshotDim << " by " << static_cast< int > ( host.screenshotDim * ( float( HEIGHT ) / float( WIDTH ) ) ) << std::endl;
+
+	// create the texture, same aspect ratio as preview texture, but with the larger dimensions
+	// this is going to be configured in the menus and kept in the config structs
+	// render the image into the
+
+}
