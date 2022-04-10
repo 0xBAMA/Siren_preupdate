@@ -1,4 +1,4 @@
-# not-quite-a-demo-engine (aka NQADE /eŋkweɪd/)
+# Built on not-quite-a-demo-engine (aka NQADE /eŋkweɪd/)
 
 # Setup
 - Requires `libsdl2-dev` on Ubuntu.
