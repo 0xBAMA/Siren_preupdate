@@ -228,6 +228,7 @@ void engine::imguiPass() {
 		ImGui::EndTabBar();
 	}
 
+    cout << "tab bar completed" << endl << std::flush;
 
 	// performance monitoring
 	static float tileValues[ PERFORMANCEHISTORY ] = {};
@@ -245,6 +246,8 @@ void engine::imguiPass() {
 
 	sprintf( tileOverlay, "avg %.2f tiles/update (%.2f ms/tile)", tileAverage, ( 1000.0f / fpsAverage ) / tileAverage );
 	sprintf( fpsOverlay, "avg %.2f fps (%.2f ms)", fpsAverage, 1000.0f / fpsAverage );
+
+    cout << "sprintfs completed" << endl << std::flush;    
 
 	// absolute positioning within the window
 	ImGui::SetCursorPosY( ImGui::GetWindowSize().y - 200 );

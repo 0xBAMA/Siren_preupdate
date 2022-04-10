@@ -7,6 +7,8 @@ set( CMAKE_CXX_STANDARD_REQUIRED True )
 set( CMAKE_CXX_FLAGS "-std=c++17 -lstdc++fs -O4" )
 set( CMAKE_REQUIRED_FLAGS -lstdc++fs )
 
+# set( CMAKE_BUILD_TYPE Debug )
+
 # this makes SDL2 work
 set( CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 
