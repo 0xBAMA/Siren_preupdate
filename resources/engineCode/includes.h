@@ -96,7 +96,7 @@ using json = nlohmann::json;
 #define PERFORMANCEHISTORY 300
 
 // not sure about this, going to need to do some testing, to maximize amount of work per timer query
-#define TILESIZE 128
+#define TILESIZE 16
 
 struct hostParameters {
 	int screenshotDim = WIDTH; // maintain ratio with HEIGHT/WIDTH

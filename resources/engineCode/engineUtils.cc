@@ -90,7 +90,7 @@ void engine::pathtrace() {
 		glUniform2i( glGetUniformLocation( pathtraceShader, "tileOffset" ), tile.x, tile.y );
 
 		// render the specified tile - dispatch
-		glDispatchCompute( TILESIZE / 32, TILESIZE / 32, 1 );
+		glDispatchCompute( TILESIZE / 16, TILESIZE / 16, 1 );
 		glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
 		tilesCompleted++;
 
