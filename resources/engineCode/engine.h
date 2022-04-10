@@ -62,7 +62,7 @@ private:
 	// program flags
 	bool quitConfirm = false;
 	bool pQuit = false;
-	bool filter	= false;
+	bool filter	= true;
 	renderMode mode = renderMode::pathtrace;
 
 	// OpenGL data handles

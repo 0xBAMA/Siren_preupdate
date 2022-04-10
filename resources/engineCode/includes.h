@@ -90,8 +90,8 @@ using json = nlohmann::json;
 // #define WIDTH 640
 // #define HEIGHT 480
 
-#define WIDTH  1920 / 4
-#define HEIGHT 1080 / 4
+#define WIDTH  1920 / 3
+#define HEIGHT 1080 / 3
 
 #define PERFORMANCEHISTORY 300
 
@@ -132,6 +132,7 @@ struct lensParameters {
 	float lensThickness = 0.3;
 	float lensRotate = 0.0;
 	float lensIOR = 1.2;
+	int lensNormalMethod = 0;
 };
 
 struct postParameters {

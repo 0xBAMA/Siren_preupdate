@@ -115,21 +115,8 @@ vec3 lensNorm( vec3 p ) {
 
 
 // surface distance estimate for the whole scene
-float de( vec3 p ){
-	p = p.xzy;
-	vec3 cSize = vec3(1., 1., 1.3);
-	float scale = 1.;
-	for( int i=0; i < 12; i++ ){
-		p = 2.0*clamp(p, -cSize, cSize) - p;
-		float r2 = dot(p,p+sin(p.z*.3));
-		float k = max((2.)/(r2), .027);
-		p *= k;  scale *= k;
-	}
-	float l = length(p.xy);
-	float rxy = l - 4.0;
-	float n = l * p.z;
-	rxy = max(rxy, -(n) / 4.);
-	return (rxy) / abs(scale);
+float de(vec3 p){
+	return min(.65-length(fract(p+.5)-.5),p.y+.2);
 }
 
 // normalized gradient of the SDF - 3 different methods

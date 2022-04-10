@@ -209,6 +209,7 @@ void engine::imguiPass() {
 			ImGui::SliderFloat( "Lens Thickness", &lens.lensThickness, 0.01, 10.0 );
 			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -4.0, 4.0 );
 			ImGui::SliderFloat( "Lens IOR", &lens.lensIOR, 0.0, 2.0 );
+			ImGui::SliderInt( "Lens Normal Method", &lens.lensNormalMethod, 0, 2 );
 			ImGui::EndTabItem();
 		}
 		if ( ImGui::BeginTabItem( " Post " ) ) {
@@ -288,11 +289,50 @@ void engine::handleEvents() {
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE && SDL_GetModState() & KMOD_SHIFT )
 			pQuit = true; // force quit on shift+esc ( bypasses confirm window )
 
-		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
-			screenShot();
+		// if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
+			// screenShot(); // this moves to the menu, triggered by a buttton - learned my lesson from Voraldo
 
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r )
 			resetAccumulator();
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w)
+			core.rotationAboutX -= SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s)
+			core.rotationAboutX += SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a)
+			core.rotationAboutY -= SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d)
+			core.rotationAboutY += SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e)
+			core.rotationAboutZ -= SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q)
+			core.rotationAboutZ += SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
+
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP)
+			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisZ;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_DOWN)
+			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisZ;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RIGHT)
+			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisX;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_LEFT)
+			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisX;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEUP)
+			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisY;
+
+		if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEDOWN)
+			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisY;
+
+
 	}
 }
 
