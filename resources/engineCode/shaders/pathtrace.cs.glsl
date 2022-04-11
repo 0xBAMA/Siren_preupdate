@@ -113,11 +113,45 @@ vec3 lensNorm( vec3 p ) {
 }
 
 
-
 // surface distance estimate for the whole scene
-float de(vec3 p){
-	return min(.65-length(fract(p+.5)-.5),p.y+.2);
+
+// float de(vec3 p){
+// 	#define M(a)mat2(cos(a+vec4(0,2,5,0)))
+// 	#define F1(a)for(int j=0;j<5;j++)p.a=abs(p.a*M(3.));(p.a).y-=3.
+// 	float t = 0.96;
+// 	p.z-=9.;
+// 	p.xz*=M(t);
+// 	F1(xy);
+// 	F1(zy);
+// 	return dot(abs(p),vec3(.3))-.5;
+// }
+
+void pR(inout vec2 p, float a) {
+	p = cos(a)*p + sin(a)*vec2(p.y, -p.x);
 }
+
+float de(vec3 p){
+	const int iterations = 20;
+	float d = -2.; // vary this parameter, range is like -20 to 20
+	p=p.yxz;
+	pR(p.yz, 1.570795);
+	p.x += 6.5;
+	p.yz = mod(abs(p.yz)-.0, 20.) - 10.;
+	float scale = 1.25;
+	p.xy /= (1.+d*d*0.0005);
+
+	float l = 0.;
+	for (int i=0; i < iterations; i++) {
+		p.xy = abs(p.xy);
+		p = p*scale + vec3(-3. + d*0.0095,-1.5,-.5);
+		pR(p.xy,0.35-d*0.015);
+		pR(p.yz,0.5+d*0.02);
+		vec3 p6 = p*p*p; p6=p6*p6;
+		l =pow(p6.x + p6.y + p6.z, 1./6.);
+	}
+	return l*pow(scale, -float(iterations))-.15;
+}
+
 
 // normalized gradient of the SDF - 3 different methods
 vec3 normal( vec3 p ) {

@@ -115,14 +115,11 @@ struct coreParameters {
 	float exposure = 0.98;
 	float focusDistance = 10.0;
 	int normalMethod = 1;
-	float FoV = 0.152;
-	glm::vec3 viewerPosition = glm::vec3( 10.0, 9.258, 7.562 );
-	float rotationAboutX = 1.541;
-	float rotationAboutY = 1.117;
-	float rotationAboutZ = 1.654;
-	glm::vec3 basisX;
-	glm::vec3 basisY;
-	glm::vec3 basisZ;
+	float FoV = 0.618;
+	glm::vec3 viewerPosition = glm::vec3( 0.0, 0.0, 0.0 );
+	glm::vec3 basisX = glm::vec3( 1.0, 0.0, 0.0 );
+	glm::vec3 basisY = glm::vec3( 0.0, 1.0, 0.0 );
+	glm::vec3 basisZ = glm::vec3( 0.0, 0.0, 1.0 );
 };
 
 struct lensParameters {

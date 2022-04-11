@@ -41,16 +41,6 @@ void engine::pathtraceUniformUpdate() {
 	glUniform1f( glGetUniformLocation( pathtraceShader, "FoV" ), core.FoV );
 	glUniform1f( glGetUniformLocation( pathtraceShader, "exposure" ), core.exposure );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "viewerPosition" ), core.viewerPosition.x, core.viewerPosition.y, core.viewerPosition.z );
-
-	// construct basis vectors from rotations
-	glm::quat rotationx = glm::angleAxis( core.rotationAboutX, glm::vec3( 1, 0, 0 ) );
-	glm::quat rotationy = glm::angleAxis( core.rotationAboutY, glm::vec3( 0, 1, 0 ) );
-	glm::quat rotationz = glm::angleAxis( core.rotationAboutZ, glm::vec3( 0, 0, 1 ) );
-	glm::mat4 rotation = glm::toMat4( rotationy * rotationx * rotationz );
-	core.basisX = ( rotation * glm::vec4( 1, 0, 0, 0 ) ).xyz();
-	core.basisY = ( rotation * glm::vec4( 0, 1, 0, 0 ) ).xyz();
-	core.basisZ = ( rotation * glm::vec4( 0, 0, 1, 0 ) ).xyz();
-
 	glUniform3f( glGetUniformLocation( pathtraceShader, "basisX"), core.basisX.x, core.basisX.y, core.basisX.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "basisY"), core.basisY.x, core.basisY.y, core.basisY.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "basisZ"), core.basisZ.x, core.basisZ.y, core.basisZ.z );
@@ -198,9 +188,9 @@ void engine::imguiPass() {
 			ImGui::SliderFloat( "Viewer X", &core.viewerPosition.x, -20.0, 20.0 );
 			ImGui::SliderFloat( "Viewer Y", &core.viewerPosition.y, -20.0, 20.0 );
 			ImGui::SliderFloat( "Viewer Z", &core.viewerPosition.z, -20.0, 20.0 );
-			ImGui::SliderFloat( "Rotation X", &core.rotationAboutX, -4.0, 4.0 );
-			ImGui::SliderFloat( "Rotation Y", &core.rotationAboutY, -4.0, 4.0 );
-			ImGui::SliderFloat( "Rotation Z", &core.rotationAboutZ, -4.0, 4.0 );
+
+			// have it tell what the current set of basis vectors is
+
 			ImGui::EndTabItem();
 		}
 		if ( ImGui::BeginTabItem( " Lens " ) ) {
@@ -290,29 +280,53 @@ void engine::handleEvents() {
 			pQuit = true; // force quit on shift+esc ( bypasses confirm window )
 
 		// if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
-			// screenShot(); // this moves to the menu, triggered by a buttton - learned my lesson from Voraldo
+			// screenShot(); // this moves to the menu, triggered by a buttton - learned my lesson from Voraldo, accidentally triggering a heavy function during normal usage
 
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r )
 			resetAccumulator();
 
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w )
-			core.rotationAboutX -= SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
+		// quaternion based rotation via retained state in the basis vectors - much easier to use than the arbitrary euler angles
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w ) {
+			glm::quat rot = glm::angleAxis( -0.1f, core.basisX );	// basisX is the axis, therefore remains untransformed
+			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
+			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s ) {
+			glm::quat rot = glm::angleAxis(  0.1f, core.basisX );
+			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
+			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a ) {
+			glm::quat rot = glm::angleAxis( -0.1f, core.basisY );	// same as above, but basisY is the axis
+			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
+			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d ) {
+			glm::quat rot = glm::angleAxis(  0.1f, core.basisY );
+			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
+			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q ) {
+			glm::quat rot = glm::angleAxis( -0.1f, core.basisZ ); // and again for basisZ
+			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
+			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e ) {
+			glm::quat rot = glm::angleAxis(  0.1f, core.basisZ );
+			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
+			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
+		}
 
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s )
-			core.rotationAboutX += SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a )
-			core.rotationAboutY -= SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d )
-			core.rotationAboutY += SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e )
-			core.rotationAboutZ -= SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q )
-			core.rotationAboutZ += SDL_GetModState() & KMOD_SHIFT ? 0.008 : 0.03;
-
+		// f to reset basis, F to reset basis and home to origin
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_f ) {
+			if( SDL_GetModState() & KMOD_SHIFT ) {
+				core.viewerPosition = glm::vec3( 0.0, 0.0, 0.0 );
+			}
+			// reset to default basis
+			core.basisX = glm::vec3( 1.0, 0.0, 0.0 );
+			core.basisY = glm::vec3( 0.0, 1.0, 0.0 );
+			core.basisZ = glm::vec3( 0.0, 0.0, 1.0 );
+		}
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP )
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisZ;
@@ -331,14 +345,6 @@ void engine::handleEvents() {
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEDOWN )
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisY;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_f ) {
-			core.viewerPosition = glm::vec3( 0.0, 0.0, 0.0 );
-			core.rotationAboutX = 0.0;
-			core.rotationAboutY = 0.0;
-			core.rotationAboutZ = 0.0;
-		}
-
 
 	}
 }
