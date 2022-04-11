@@ -44,7 +44,7 @@ constexpr int MSAACount = 1;
 #include "../GLM/gtx/rotate_vector.hpp"
 #include "../GLM/gtx/transform.hpp"
 #include "../GLM/gtx/quaternion.hpp"
-#include "../GLM/gtx/string_cast.hpp"
+#include "../GLM/gtx/string_cast.hpp"				// to_string for glm types
 
 // not sure as to the utility of this
 #define GLX_GLEXT_PROTOTYPES
@@ -90,54 +90,51 @@ using json = nlohmann::json;
 // #define WIDTH 640
 // #define HEIGHT 480
 
-#define WIDTH  1920 / 3
-#define HEIGHT 1080 / 3
+#define WIDTH  1920 / 3																			// width of the texture that the tiles render to
+#define HEIGHT 1080 / 3																			// height of the texture that the tiles render to
 
-#define PERFORMANCEHISTORY 250
-
-// not sure about this, going to need to do some testing, to maximize amount of work per timer query
-#define TILESIZE 16
+#define PERFORMANCEHISTORY 250															// how many datapoints to keep for tile count / fps
+#define TILESIZE 16																					// previously 128, but I don't think that gave sufficient granularity
 
 struct hostParameters {
-	int screenshotDim = WIDTH; // maintain ratio with HEIGHT/WIDTH
-	int tilePerFrameCap = 128;	// max number of tiles to be executed in a frame update
-	int numSamplesScreenshot = 128; // how many samples to take when rendering the screenshot
+	int screenshotDim = WIDTH; 																// width of the screenshot - the code maintains the aspect ratio of HEIGHT/WIDTH
+	int tilePerFrameCap = 128;																// max number of tiles allowed to be executed in a frame update
+	int numSamplesScreenshot = 128; 													// how many samples to take when rendering the screenshot
 };
 
 struct coreParameters {
-	glm::ivec2 tileOffset = glm::ivec2( 0, 0 ); // x, y of current tile
-	// updated once a frame, offset blue noise texture so there isn't Voraldo's stroke pattern in v1.2
-	glm::ivec2 noiseOffset = glm::ivec2( 0, 0 );
-	int maxSteps = 100;
-	int maxBounces = 10;
-	float maxDistance = 15.0;
-	float epsilon = 0.001;
-	float exposure = 0.98;
-	float focusDistance = 10.0;
-	int normalMethod = 1;
-	float FoV = 0.618;
-	glm::vec3 viewerPosition = glm::vec3( 0.0, 0.0, 0.0 );
-	glm::vec3 basisX = glm::vec3( 1.0, 0.0, 0.0 );
+	glm::ivec2 tileOffset = glm::ivec2( 0, 0 ); 							// x, y of current tile
+	glm::ivec2 noiseOffset = glm::ivec2( 0, 0 );							// updated once a frame, offset blue noise texture so there isn't Voraldo's stroke pattern in v1.2
+	int maxSteps = 100;																				// max raymarch steps
+	int maxBounces = 10;																			// max pathtrace bounces
+	float maxDistance = 15.0;																	// max raymarch distance
+	float epsilon = 0.001;																		// raymarch surface epsilon
+	float exposure = 0.98;																		// scale factor for the final color result
+	float focusDistance = 10.0;																// used for the thin lens approximation ( include an intensity scalar to this as well ( resize jitter disk ) )
+	int normalMethod = 1;																			// method for calculating the surface normal for the SDF geometry
+	float FoV = 0.618;																				// FoV for the rendering - higher is wider
+	glm::vec3 viewerPosition = glm::vec3( 0.0, 0.0, 0.0 );		// location of the viewer
+	glm::vec3 basisX = glm::vec3( 1.0, 0.0, 0.0 );						// basis vectors are used to control viewer movement and rotation, as well as create the camera
 	glm::vec3 basisY = glm::vec3( 0.0, 1.0, 0.0 );
 	glm::vec3 basisZ = glm::vec3( 0.0, 0.0, 1.0 );
 };
 
 struct lensParameters {
-	float lensScaleFactor = 1.0;
-	float lensRadius1 = 10.0;
-	float lensRadius2 = 3.0;
-	float lensThickness = 0.3;
-	float lensRotate = 0.0;
-	float lensIOR = 1.2;
-	int lensNormalMethod = 0;
+	float lensScaleFactor = 1.0;															// size of the lens object - vessica pices, in 3d ( intersection of two offset spheres )
+	float lensRadius1 = 10.0;																	// radius of the first side of the lens
+	float lensRadius2 = 3.0;																	// radius of the second side of the lens
+	float lensThickness = 0.3;																// amount by which the spheres are offset from one another, before intersection
+	float lensRotate = 0.0;																		// rotates the lens - should this be done this way, or two points? maybe a quaternion
+	float lensIOR = 1.2;																			// index of refraction of the lens material
+	int lensNormalMethod = 0;																	// method by which to determine the surface normal of the lens SDF - this may eventually be picked and hardcoded
 };
 
 struct postParameters {
-	int ditherMode = 0;
-	int ditherMethod = 0;
-	int ditherPattern = 0;
-	int tonemapMode = 0;
-	int depthMode = 0;
-	float depthScale = 0.0;
+	int ditherMode = 0;																				// colorspace
+	int ditherMethod = 0;																			// bitcrush bitcount or exponential scalar
+	int ditherPattern = 0;																		// pattern used to dither the output
+	int tonemapMode = 0;																			// tonemap curve to use
+	int depthMode = 0;																				// depth fog method
+	float depthScale = 0.0;																		// scalar for depth term
 };
 #endif
