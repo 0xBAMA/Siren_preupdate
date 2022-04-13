@@ -9,7 +9,7 @@ layout( binding = 2, rgba32f ) uniform image2D accumulatorNormalsAndDepth;
 layout( binding = 3, rgba8ui ) uniform uimage2D blueNoise;
 
 #define PI 3.1415926535897932384626433832795
-#define AA 2 // each sample is actually 2^2 = 4 offset samples
+#define AA 2 // each sample is actually 2*2 = 4 offset samples
 
 // core rendering stuff
 uniform ivec2	tileOffset;					// tile renderer offset for the current tile
@@ -27,6 +27,7 @@ uniform vec3	viewerPosition;			// position of the viewer
 uniform vec3	basisX;							// x basis vector
 uniform vec3	basisY;							// y basis vector
 uniform vec3	basisZ;							// z basis vector
+uniform int		wangSeed;						// integer value used for seeding the wang hash rng
 
 // lens parameters
 uniform float lensScaleFactor;		// scales the lens DE
@@ -75,8 +76,8 @@ vec3 randomUnitVector() {
 	return vec3( x, y, z );
 }
 
-vec3 randomInUnitDisk() {
-	return vec3( randomUnitVector().xy, 0. );
+vec2 randomInUnitDisk() {
+	return randomUnitVector().xy;
 }
 
 
@@ -135,7 +136,7 @@ float de(vec3 p){
 	p=p.yxz;
 	pR(p.yz, 1.570795);
 	p.x += 6.5;
-	p.yz = mod(abs(p.yz)-.0, 20.) - 10.;
+	// p.yz = mod(abs(p.yz)-.0, 20.) - 10.;
 	float scale = 1.25;
 	p.xy /= (1.+d*d*0.0005);
 
@@ -197,8 +198,11 @@ vec3 colorSample( vec3 rayOrigin, vec3 rayDirection ) {
 	// loop to max bounces
 
 	float rayDistance = raymarch( rayOrigin, rayDirection );
-	return vec3( rayDistance );
-
+	// return vec3( rayDistance );
+	if( de( rayOrigin + rayDistance * rayDirection ) < epsilon )
+		return normal( rayOrigin + rayDistance * rayDirection );
+	else
+		return vec3( 0.0 );
 }
 
 
@@ -207,10 +211,11 @@ void storeNormalAndDepth( vec3 normal, float depth ) {
 }
 
 vec3 pathtraceSample( ivec2 location ) {
-	vec3  cResult = vec3( 0. );
-	vec3  nResult = vec3( 0. );
-	float dResult = 0.;
+	vec3  cResult = vec3( 0.0 );
+	vec3  nResult = vec3( 0.0 );
+	float dResult = 0.0;
 
+	// at AA = 2, this is 4 samples per invocation
 	for( int x = 0; x < AA; x++ ) {
 		for( int y = 0; y < AA; y++ ) {
 			// pixel offset + mapped position
@@ -226,7 +231,11 @@ vec3 pathtraceSample( ivec2 location ) {
 			vec3 rayOrigin    = viewerPosition;
 
 			// thin lens DoF - adjust view vectors to converge at focusDistance
-				// this is a small adjustment to the ray origin and direction
+				// this is a small adjustment to the ray origin and direction - not working correctly - need to revist this
+			vec3 focuspoint = rayOrigin + ( ( rayDirection * focusDistance ) / dot( rayDirection, basisZ ) );
+			vec2 diskOffset = thinLensIntensity * randomInUnitDisk();
+			rayOrigin += diskOffset.x * basisX + diskOffset.y * basisY + thinLensIntensity * randomFloat() * basisZ;
+			rayDirection = normalize( focuspoint - rayOrigin );
 
 			// get depth and normals - move this to the colorSample function? - think about special handling for refractive hits
 
@@ -240,6 +249,7 @@ vec3 pathtraceSample( ivec2 location ) {
 
 void main() {
 	location = ivec2( gl_GlobalInvocationID.xy ) + tileOffset;
+	seed = location.x + 10000 * location.y + wangSeed;
 
 	if( !boundsCheck( location ) ) return; // abort on out of bounds
 	vec4 prevResult = imageLoad( accumulatorColor, location );

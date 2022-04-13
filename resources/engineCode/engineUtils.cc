@@ -73,12 +73,21 @@ void engine::pathtrace() {
 	glGetQueryObjectiv( queryID[ 0 ], GL_QUERY_RESULT_AVAILABLE, &startTimeAvailable );
 	glGetQueryObjectui64v( queryID[ 0 ], GL_QUERY_RESULT, &startTime );
 
+	// used for the wang hash seeding, as well as the noise offset
+	std::default_random_engine gen;
+	std::uniform_int_distribution< int > dist( 0, std::numeric_limits< int >::max() / 4 );
+
 	int tilesCompleted = 0;
 	float looptime = 0.;
 	while( 1 ) {
 		// get a tile offset + send it
 		glm::ivec2 tile = getTile();
 		glUniform2i( glGetUniformLocation( pathtraceShader, "tileOffset" ), tile.x, tile.y );
+
+		// seeding the wang rng in the shader - shader uses both the screen location and this value
+		int value = dist( gen );
+		// cout << value << endl;
+		glUniform1i( glGetUniformLocation( pathtraceShader, "wangSeed" ), value );
 
 		// render the specified tile - dispatch
 		glDispatchCompute( TILESIZE / 16, TILESIZE / 16, 1 );
@@ -176,12 +185,12 @@ void engine::imguiPass() {
 			// core renderer parameters
 			ImGui::SliderInt( "Max Raymarch Steps", &core.maxSteps, 1, 500 );
 			ImGui::SliderInt( "Max Light Bounces", &core.maxBounces, 1, 50 );
-			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0, 100.0 );
+			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0, 1000.0 );
 			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001, 0.1 );
 			ImGui::Separator();
 			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1, 3.6 );
-			ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0, 100.0 );
-			ImGui::SliderFloat( "Thin Lens Effect Intensity", &core.thinLensIntensity, 0.0, 2.0 );
+			ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0, 200.0 );
+			ImGui::SliderFloat( "Thin Lens Effect Intensity", &core.thinLensIntensity, 0.0, 5.0 );
 			ImGui::Separator();
 			ImGui::SliderInt( "SDF Normal Method", &core.normalMethod, 1, 3 );
 			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01, 0.9 );

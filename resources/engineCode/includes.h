@@ -107,7 +107,7 @@ struct coreParameters {
 	glm::ivec2 noiseOffset = glm::ivec2( 0, 0 );							// updated once a frame, offset blue noise texture so there isn't Voraldo's stroke pattern in v1.2
 	int maxSteps = 100;																				// max raymarch steps
 	int maxBounces = 10;																			// max pathtrace bounces
-	float maxDistance = 15.0;																	// max raymarch distance
+	float maxDistance = 100.0;																// max raymarch distance
 	float epsilon = 0.001;																		// raymarch surface epsilon
 	float exposure = 0.98;																		// scale factor for the final color result
 	float focusDistance = 10.0;																// used for the thin lens approximation ( include an intensity scalar to this as well ( resize jitter disk ) )
