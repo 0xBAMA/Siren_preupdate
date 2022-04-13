@@ -12,28 +12,29 @@ layout( binding = 3, rgba8ui ) uniform uimage2D blueNoise;
 #define AA 2 // each sample is actually 2^2 = 4 offset samples
 
 // core rendering stuff
-uniform ivec2 tileOffset;       // tile renderer offset for the current tile
-uniform ivec2 noiseOffset;      // jitters the noise sample read locations
-uniform int   maxSteps;         // max steps to hit
-uniform int   maxBounces;       // number of pathtrace bounces
-uniform float maxDistance;      // maximum ray travel
-uniform float epsilon;          // how close is considered a surface hit
-uniform int   normalMethod;     // selector for normal computation method
-uniform float focusDistance;    // for thin lens approx
-uniform float FoV;              // field of view
-uniform float exposure;         // exposure adjustment
-uniform vec3  viewerPosition;   // position of the viewer
-uniform vec3  basisX;           // x basis vector
-uniform vec3  basisY;           // y basis vector
-uniform vec3  basisZ;           // z basis vector
+uniform ivec2	tileOffset;					// tile renderer offset for the current tile
+uniform ivec2	noiseOffset;				// jitters the noise sample read locations
+uniform int		maxSteps;						// max steps to hit
+uniform int		maxBounces;					// number of pathtrace bounces
+uniform float	maxDistance;				// maximum ray travel
+uniform float	epsilon;						// how close is considered a surface hit
+uniform int		normalMethod;				// selector for normal computation method
+uniform float	focusDistance;			// for thin lens approx
+uniform float	thinLensIntensity;	// scalar on the thin lens DoF effect
+uniform float	FoV;								// field of view
+uniform float	exposure;						// exposure adjustment
+uniform vec3	viewerPosition;			// position of the viewer
+uniform vec3	basisX;							// x basis vector
+uniform vec3	basisY;							// y basis vector
+uniform vec3	basisZ;							// z basis vector
 
 // lens parameters
-uniform float lensScaleFactor;  // scales the lens DE
-uniform float lensRadius1;      // radius of the sphere for the first side
-uniform float lensRadius2;      // radius of the sphere for the second side
-uniform float lensThickness;    // offset between the two spheres
-uniform float lensRotate;       // rotating the displacement offset betwee spheres
-uniform float lensIOR;          // index of refraction for the lens
+uniform float lensScaleFactor;		// scales the lens DE
+uniform float lensRadius1;				// radius of the sphere for the first side
+uniform float lensRadius2;				// radius of the sphere for the second side
+uniform float lensThickness;			// offset between the two spheres
+uniform float lensRotate;					// rotating the displacement offset betwee spheres
+uniform float lensIOR;						// index of refraction for the lens
 
 // global state
 float sampleCount = 0.0;
@@ -77,8 +78,6 @@ vec3 randomUnitVector() {
 vec3 randomInUnitDisk() {
 	return vec3( randomUnitVector().xy, 0. );
 }
-
-
 
 
 
@@ -178,10 +177,6 @@ vec3 normal( vec3 p ) {
 	}
 }
 
-
-
-
-
 // raymarches to the next hit
 float raymarch( vec3 origin, vec3 direction ) {
 	float dQuery = 0.0;
@@ -197,14 +192,13 @@ float raymarch( vec3 origin, vec3 direction ) {
 	return dTotal;
 }
 
-
-ivec2 location;
+ivec2 location;	// 2d location, pixel coords
 vec3 colorSample( vec3 rayOrigin, vec3 rayDirection ) {
 	// loop to max bounces
 
-	float distance = raymarch( rayOrigin, rayDirection );
-	return normal( rayOrigin + distance * rayDirection );
-	// return vec3( de( rayOrigin + 2.0 * rayDirection ) );
+	float rayDistance = raymarch( rayOrigin, rayDirection );
+	return vec3( rayDistance );
+
 }
 
 
@@ -221,17 +215,18 @@ vec3 pathtraceSample( ivec2 location ) {
 		for( int y = 0; y < AA; y++ ) {
 			// pixel offset + mapped position
 			vec2 offset = vec2( x + randomFloat(), y + randomFloat() ) / float( AA ) - 0.5;
-			vec2 halfScreenCoord = vec2( imageSize( accumulatorColor ) / 2. );
+			vec2 halfScreenCoord = vec2( imageSize( accumulatorColor ) / 2.0 );
 			vec2 mappedPosition = ( vec2( location + offset ) - halfScreenCoord ) / halfScreenCoord;
 
 			// aspect ratio
 			float aspectRatio = float( imageSize( accumulatorColor ).x ) / float( imageSize( accumulatorColor ).y );
 
 			// ray origin + direction
-			vec3 rayDirection = normalize( aspectRatio * mappedPosition.x * basisX + mappedPosition.y * basisY + ( 1. / FoV ) * basisZ );
+			vec3 rayDirection = normalize( aspectRatio * mappedPosition.x * basisX + mappedPosition.y * basisY + ( 1.0 / FoV ) * basisZ );
 			vec3 rayOrigin    = viewerPosition;
 
 			// thin lens DoF - adjust view vectors to converge at focusDistance
+				// this is a small adjustment to the ray origin and direction
 
 			// get depth and normals - move this to the colorSample function? - think about special handling for refractive hits
 

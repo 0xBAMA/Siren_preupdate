@@ -38,13 +38,13 @@ constexpr int MSAACount = 1;
 // vector math library GLM
 #define GLM_FORCE_SWIZZLE
 #define GLM_SWIZZLE_XYZW
-#include "../GLM/glm.hpp"                  //general vector types
-#include "../GLM/gtc/matrix_transform.hpp" // for glm::ortho
-#include "../GLM/gtc/type_ptr.hpp"         //to send matricies gpu-side
+#include "../GLM/glm.hpp"														// general vector types
+#include "../GLM/gtc/matrix_transform.hpp"					// for glm::ortho
+#include "../GLM/gtc/type_ptr.hpp"									// to send matricies gpu-side
 #include "../GLM/gtx/rotate_vector.hpp"
 #include "../GLM/gtx/transform.hpp"
 #include "../GLM/gtx/quaternion.hpp"
-#include "../GLM/gtx/string_cast.hpp"				// to_string for glm types
+#include "../GLM/gtx/string_cast.hpp"								// to_string for glm types
 
 // not sure as to the utility of this
 #define GLX_GLEXT_PROTOTYPES
@@ -111,6 +111,7 @@ struct coreParameters {
 	float epsilon = 0.001;																		// raymarch surface epsilon
 	float exposure = 0.98;																		// scale factor for the final color result
 	float focusDistance = 10.0;																// used for the thin lens approximation ( include an intensity scalar to this as well ( resize jitter disk ) )
+	float thinLensIntensity = 1.0;														// scales the disk offset for the thin lens approximation ( scales the intensity of the effect )
 	int normalMethod = 1;																			// method for calculating the surface normal for the SDF geometry
 	float FoV = 0.618;																				// FoV for the rendering - higher is wider
 	glm::vec3 viewerPosition = glm::vec3( 0.0, 0.0, 0.0 );		// location of the viewer

@@ -181,6 +181,7 @@ void engine::imguiPass() {
 			ImGui::Separator();
 			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1, 3.6 );
 			ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0, 100.0 );
+			ImGui::SliderFloat( "Thin Lens Effect Intensity", &core.thinLensIntensity, 0.0, 2.0 );
 			ImGui::Separator();
 			ImGui::SliderInt( "SDF Normal Method", &core.normalMethod, 1, 3 );
 			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01, 0.9 );
