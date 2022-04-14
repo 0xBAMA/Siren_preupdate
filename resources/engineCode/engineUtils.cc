@@ -146,6 +146,7 @@ void engine::resetAccumulator() {
 	glBindTexture( GL_TEXTURE_2D, accumulatorTexture );
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageData[ 0 ] );
 	glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
+	fullscreenPasses = 0; // reset sample count
 	cout << "Accumulator Buffer has been reinitialized" << endl;
 }
 
@@ -247,7 +248,7 @@ void engine::imguiPass() {
 	sprintf( fpsOverlay, "avg %.2f fps (%.2f ms)", fpsAverage, 1000.0f / fpsAverage );
 
 	// absolute positioning within the window
-	ImGui::SetCursorPosY( ImGui::GetWindowSize().y - 200 );
+	ImGui::SetCursorPosY( ImGui::GetWindowSize().y - 215 );
 	ImGui::Text(" Performance Monitor");
 	ImGui::SameLine();
 	HelpMarker("Tiles are processed asynchronously to the frame update. This means that an arbitrary number of tiles may be processed in the space between frames, depending on hardware capabilities and the shader complexity, as configured. The program is designed to maintain ~60fps for responsiveness, regardless of what this hardware capability may be ( up to the point where the execution time of a single tile exceeds the total alotted frame time of 16ms ).");
@@ -263,6 +264,7 @@ void engine::imguiPass() {
 		// should stay flat (tm) at 60fps, given the structure of the pathtracing function ( abort on t >= 60fps equivalent )
 	ImGui::SetCursorPosX( 15 );
 	ImGui::PlotLines( " ", fpsValues, IM_ARRAYSIZE( fpsValues ), 0, fpsOverlay, -10.0f, 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
+	ImGui::Text("  Current Sample Count: %d", fullscreenPasses );
 
 	// finished with the settings window
 	ImGui::End();
@@ -375,7 +377,7 @@ glm::ivec2 engine::getTile() {
 		}
 	} else { // check if the offset needs to be reset
 		if ( ++listOffset == int( offsets.size() ) ) {
-			listOffset = 0;
+			listOffset = 0; fullscreenPasses++;
 		}
 	}
 	// shuffle when listOffset is zero ( first iteration, and any subsequent resets )
