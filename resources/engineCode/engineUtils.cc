@@ -194,7 +194,7 @@ void engine::imguiPass() {
 			ImGui::SliderFloat( "Thin Lens Effect Intensity", &core.thinLensIntensity, 0.0, 5.0 );
 			ImGui::Separator();
 			ImGui::SliderInt( "SDF Normal Method", &core.normalMethod, 1, 3 );
-			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01, 0.9 );
+			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01, 2.5 );
 			ImGui::Separator();
 			ImGui::SliderFloat( "Viewer X", &core.viewerPosition.x, -20.0, 20.0 );
 			ImGui::SliderFloat( "Viewer Y", &core.viewerPosition.y, -20.0, 20.0 );

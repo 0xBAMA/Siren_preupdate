@@ -129,21 +129,30 @@ vec3 lensNorm( vec3 p ) {
 vec3 hitpointDiffuse = vec3( 0.0 );
 
 // 0 nohit
+#define NOHIT 0
 // 1 diffuse
+#define DIFFUSE 1
 // 2 emissive
+#define EMISSIVE 2
+
+// identifier for the hit surface
 int hitpointSurfaceType = 0;
 
-void pR(inout vec2 p, float a) {
-	p = cos(a)*p + sin(a)*vec2(p.y, -p.x);
+
+void pR( inout vec2 p, float a ) {
+	p = cos( a ) * p + sin( a ) * vec2( p.y, -p.x );
 }
 
 float deFractal(vec3 p){
+	float scalar = 0.25;
+	p /= scalar;
+
 	const int iterations = 20;
 	float d = -2.; // vary this parameter, range is like -20 to 20
 	p=p.yxz;
 	pR(p.yz, 1.570795);
 	p.x += 6.5;
-	// p.yz = mod(abs(p.yz)-.0, 20.) - 10.;
+	p.yz = mod(abs(p.yz)-.0, 20.) - 10.;
 	float scale = 1.25;
 	p.xy /= (1.+d*d*0.0005);
 
@@ -156,32 +165,71 @@ float deFractal(vec3 p){
 		vec3 p6 = p*p*p; p6=p6*p6;
 		l =pow(p6.x + p6.y + p6.z, 1./6.);
 	}
-	return l*pow(scale, -float(iterations))-.15;
+	return ( l * pow( scale, -float( iterations ) ) - 0.15 ) * scalar;
 }
 
-float de( vec3 p ){
+float dePlane( vec3 p, vec3 normal, float distanceFromOrigin ) {
+	return dot( p, normal ) + distanceFromOrigin;
+}
+
+float de( vec3 p ) {
 	// init nohit, far from surface, no diffuse color
-	hitpointSurfaceType = 0;
-	float distance = 1000.0;
+	hitpointSurfaceType = NOHIT;
+	float sceneDist = 1000.0;
 	hitpointDiffuse = vec3( 0.0 );
 
-
 	// cornell box
-	// red wall
+	// red wall ( left )
+	float dRedWall = dePlane( p, vec3( 1.0, 0.0, 0.0 ), 10.0 );
+	sceneDist = min( dRedWall, sceneDist );
+	if( sceneDist == dRedWall && dRedWall <= epsilon ) {
+		hitpointDiffuse = vec3( 1.0, 0.0, 0.0 );
+		hitpointSurfaceType = DIFFUSE;
+	}
 
-	// green wall
+	// green wall ( right )
+	float dGreenWall = dePlane( p, vec3( -1.0, 0.0, 0.0 ), 10.0 );
+	sceneDist = min( dGreenWall, sceneDist );
+	if( sceneDist == dGreenWall && dGreenWall <= epsilon ) {
+		hitpointDiffuse = vec3( 0.0, 1.0, 0.0 );
+		hitpointSurfaceType = DIFFUSE;
+	}
 
-	// white walls
+	// white walls ( front and back )
+	float dWhiteWalls = min( dePlane( p, vec3( 0.0, 0.0, 1.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 0.0, -1.0 ), 10.0 ) );
+	sceneDist = min( dWhiteWalls, sceneDist );
+	if( sceneDist == dWhiteWalls && dWhiteWalls <= epsilon ) {
+		hitpointDiffuse = vec3( 0.78 );
+		hitpointSurfaceType = DIFFUSE;
+	}
 
 	// fractal object - color tbd
+	float dFractal = deFractal( p );
+	sceneDist = min( dFractal, sceneDist );
+	if( sceneDist == dFractal && dFractal <= epsilon ) {
+		hitpointDiffuse = vec3( 0.28, 0.42, 0.56 );
+		hitpointSurfaceType = DIFFUSE;
+	}
 
 	// cieling and floor
-		//  light source as a square in the middle of the cieling
+	float dFloorCieling = min( dePlane( p, vec3( 0.0, -1.0, 0.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 1.0, 0.0 ), 5.0 ) );
+	sceneDist = min( dFloorCieling, sceneDist );
+	if( sceneDist == dFloorCieling && dFloorCieling <= epsilon ) {
+		hitpointDiffuse = vec3( 0.9 );
+		hitpointSurfaceType = DIFFUSE;
+	}
 
-	// wang hash seeded scattered emissive spheres in the negative space? maybe refractive
+	float dLightBall = distance( p, vec3( 0.0, 6.0, 0.0 ) ) - 2.0;
+	sceneDist = min( dLightBall, sceneDist );
+	if( sceneDist == dLightBall && dLightBall <= epsilon ) {
+		hitpointDiffuse = vec3( 1.0 );
+		hitpointSurfaceType = EMISSIVE;
+	}
+
+	// wang hash seeded scattered emissive spheres of random colors in the negative space? maybe refractive, not sure
 		// need to make sure that the seed is constant, and the existing seed is cached and restored, if I'm going to do this
 
-
+	return sceneDist;
 }
 
 
@@ -230,9 +278,8 @@ vec3 colorSample( vec3 rayOrigin, vec3 rayDirection ) {
 	// loop to max bounces
 
 	float rayDistance = raymarch( rayOrigin, rayDirection );
-	// return vec3( rayDistance );
 	if( de( rayOrigin + rayDistance * rayDirection ) < epsilon )
-		return normal( rayOrigin + rayDistance * rayDirection );
+		return hitpointDiffuse;
 	else
 		return vec3( 0.0 );
 }
