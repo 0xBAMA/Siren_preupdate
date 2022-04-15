@@ -148,7 +148,8 @@ float deFractal(vec3 p){
 	p /= scalar;
 
 	const int iterations = 20;
-	float d = -2.; // vary this parameter, range is like -20 to 20
+	float d = ( p.z * scalar ) * 2.0;
+	// float d = -2.; // vary this parameter, range is like -20 to 20
 	p=p.yxz;
 	pR(p.yz, 1.570795);
 	p.x += 6.5;
@@ -203,11 +204,11 @@ float de( vec3 p ) {
 		hitpointSurfaceType = DIFFUSE;
 	}
 
-	// fractal object - color tbd
+	// fractal object
 	float dFractal = deFractal( p );
 	sceneDist = min( dFractal, sceneDist );
 	if( sceneDist == dFractal && dFractal <= epsilon ) {
-		hitpointDiffuse = vec3( 0.28, 0.42, 0.56 );
+		hitpointDiffuse = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 20.0 ) * 2.0;
 		hitpointSurfaceType = DIFFUSE;
 	}
 
@@ -232,6 +233,18 @@ float de( vec3 p ) {
 	return sceneDist;
 }
 
+// fake AO, computed from SDF
+float calcAO( in vec3 pos, in vec3 nor ) {
+	float occ = 0.0;
+	float sca = 1.0;
+	for( int i = 0; i < 5; i++ ) {
+		float h = 0.001 + 0.15 * float( i ) / 4.0;
+		float d = de( pos + h * nor );
+		occ += ( h - d ) * sca;
+		sca *= 0.95;
+	}
+	return clamp( 1.0 - 1.5 * occ, 0.0, 1.0 );
+}
 
 // normalized gradient of the SDF - 3 different methods
 vec3 normal( vec3 p ) {
@@ -278,8 +291,11 @@ vec3 colorSample( vec3 rayOrigin, vec3 rayDirection ) {
 	// loop to max bounces
 
 	float rayDistance = raymarch( rayOrigin, rayDirection );
+	vec3 pHit = rayOrigin + rayDistance * rayDirection;
+	vec3 surfaceDiffuse = hitpointDiffuse;
+
 	if( de( rayOrigin + rayDistance * rayDirection ) < epsilon )
-		return hitpointDiffuse;
+		return surfaceDiffuse * calcAO( pHit, normal( pHit ) );
 	else
 		return vec3( 0.0 );
 }
