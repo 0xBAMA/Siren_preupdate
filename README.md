@@ -24,4 +24,4 @@ Some areas to improve / mess around with:
 		- Clears ( every other row / checkerboard )
 		- Dither inside tile
 		- Reset averaging ( sample count )
-		- Use std::vector + shuffle to on an array of floats cast to a byte array - make a mess of the data
+		- Use std::vector + shuffle to on an array of floats cast to a byte array - make a mess of it, but check for NaN's in the data before re-sending to keep from having issues from that
