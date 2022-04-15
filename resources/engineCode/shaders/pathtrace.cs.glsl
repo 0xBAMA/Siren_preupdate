@@ -126,11 +126,18 @@ vec3 lensNorm( vec3 p ) {
 // 	return dot(abs(p),vec3(.3))-.5;
 // }
 
+vec3 hitpointDiffuse = vec3( 0.0 );
+
+// 0 nohit
+// 1 diffuse
+// 2 emissive
+int hitpointSurfaceType = 0;
+
 void pR(inout vec2 p, float a) {
 	p = cos(a)*p + sin(a)*vec2(p.y, -p.x);
 }
 
-float de(vec3 p){
+float deFractal(vec3 p){
 	const int iterations = 20;
 	float d = -2.; // vary this parameter, range is like -20 to 20
 	p=p.yxz;
@@ -150,6 +157,31 @@ float de(vec3 p){
 		l =pow(p6.x + p6.y + p6.z, 1./6.);
 	}
 	return l*pow(scale, -float(iterations))-.15;
+}
+
+float de( vec3 p ){
+	// init nohit, far from surface, no diffuse color
+	hitpointSurfaceType = 0;
+	float distance = 1000.0;
+	hitpointDiffuse = vec3( 0.0 );
+
+
+	// cornell box
+	// red wall
+
+	// green wall
+
+	// white walls
+
+	// fractal object - color tbd
+
+	// cieling and floor
+		//  light source as a square in the middle of the cieling
+
+	// wang hash seeded scattered emissive spheres in the negative space? maybe refractive
+		// need to make sure that the seed is constant, and the existing seed is cached and restored, if I'm going to do this
+
+
 }
 
 
