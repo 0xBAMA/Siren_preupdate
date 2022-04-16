@@ -43,7 +43,7 @@ private:
 	void imguiFrameEnd();
 	void drawTextEditor();
 	void screenShot();
-	void resetAccumulator();
+	void resetAccumulators();
 	void quitConf( bool *open );
 	void HelpMarker( const char* message );
 
@@ -67,7 +67,8 @@ private:
 
 	// OpenGL data handles
 		// render
-	GLuint accumulatorTexture;
+	GLuint colorAccumulatorTexture;
+	GLuint normalAccumulatorTexture;
 	GLuint blueNoiseTexture;
 	GLuint raymarchShader;
 	GLuint pathtraceShader;

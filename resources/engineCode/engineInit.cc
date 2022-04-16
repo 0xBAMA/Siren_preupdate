@@ -104,12 +104,18 @@ void engine::createWindowAndContext() {
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageData[ 0 ] );
 	glBindImageTexture( 0, displayTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8UI );
 
-	// pathtrace accumulator
-	glGenTextures( 1, &accumulatorTexture );
+	// pathtrace accumulators
+	glGenTextures( 1, &colorAccumulatorTexture );
 	glActiveTexture( GL_TEXTURE0 + 1 );
-	glBindTexture( GL_TEXTURE_2D, accumulatorTexture );
+	glBindTexture( GL_TEXTURE_2D, colorAccumulatorTexture );
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageData[ 0 ] );
-	glBindImageTexture( 1, accumulatorTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F );
+	glBindImageTexture( 1, colorAccumulatorTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F );
+
+	glGenTextures( 1, &normalAccumulatorTexture );
+	glActiveTexture( GL_TEXTURE0 + 2 );
+	glBindTexture( GL_TEXTURE_2D, normalAccumulatorTexture );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageData[ 0 ] );
+	glBindImageTexture( 2, normalAccumulatorTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F );
 
 	// blue noise texture
 	unsigned lWidth, lHeight, lError;
@@ -119,10 +125,10 @@ void engine::createWindowAndContext() {
 		cout << "Blue noise - decoder error " << lError << ": " << lodepng_error_text( lError ) << endl;
 
 	glGenTextures( 1, &blueNoiseTexture );
-	glActiveTexture( GL_TEXTURE0 + 2 );
+	glActiveTexture( GL_TEXTURE0 + 3 );
 	glBindTexture( GL_TEXTURE_2D, blueNoiseTexture );
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, lWidth, lHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, &lImage[ 0 ] );
-	glBindImageTexture( 2, blueNoiseTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8UI );
+	glBindImageTexture( 3, blueNoiseTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8UI );
 
 	cout << T_GREEN << "done." << RESET << endl;
 }

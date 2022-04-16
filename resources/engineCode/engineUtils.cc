@@ -2,7 +2,7 @@
 
 bool engine::mainLoop() {
 	render();											// render with the current mode
-	postprocess( );								// accumulatorTexture -> displayTexture
+	postprocess( );								// colorAccumulatorTexture -> displayTexture
 	mainDisplayBlit();						// fullscreen triangle copying the image
 	imguiPass();									// do all the GUI stuff
 	SDL_GL_SwapWindow( window );	// swap the double buffers to present
@@ -139,12 +139,18 @@ void engine::mainDisplayBlit() {
 	glDrawArrays( GL_TRIANGLES, 0, 3 );
 }
 
-void engine::resetAccumulator() {
+void engine::resetAccumulators() {
 	std::vector< unsigned char > imageData;
 	imageData.resize( WIDTH * HEIGHT * 4, 0 );
+	// reset color accumulator
 	glActiveTexture( GL_TEXTURE0 + 1 );
-	glBindTexture( GL_TEXTURE_2D, accumulatorTexture );
+	glBindTexture( GL_TEXTURE_2D, colorAccumulatorTexture );
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageData[ 0 ] );
+	// reset normal/depth accumulator
+	glActiveTexture( GL_TEXTURE0 + 2 );
+	glBindTexture( GL_TEXTURE_2D, normalAccumulatorTexture );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageData[ 0 ] );
+	// wait for sync
 	glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
 	fullscreenPasses = 0; // reset sample count
 	cout << "Accumulator Buffer has been reinitialized" << endl;
@@ -295,7 +301,7 @@ void engine::handleEvents() {
 			// screenShot(); // this moves to the menu, triggered by a buttton - learned my lesson from Voraldo, accidentally triggering a heavy function during normal usage
 
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r )
-			resetAccumulator();
+			resetAccumulators();
 
 		// quaternion based rotation via retained state in the basis vectors - much easier to use than the arbitrary euler angles
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w ) {

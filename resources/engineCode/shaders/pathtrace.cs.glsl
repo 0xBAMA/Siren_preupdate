@@ -2,10 +2,7 @@
 layout( local_size_x = 16, local_size_y = 16, local_size_z = 1 ) in;
 
 layout( binding = 1, rgba32f ) uniform image2D accumulatorColor;
-
-// add another texture to hold normals in R, G, B and depth in A
 layout( binding = 2, rgba32f ) uniform image2D accumulatorNormalsAndDepth;
-
 layout( binding = 3, rgba8ui ) uniform uimage2D blueNoise;
 
 #define PI 3.1415926535897932384626433832795
@@ -254,24 +251,31 @@ float raymarch( vec3 origin, vec3 direction ) {
 	return dTotal;
 }
 
-ivec2 location;	// 2d location, pixel coords
+ivec2 location = ivec2( 0, 0 );	// 2d location, pixel coords
 vec3 colorSample( vec3 rayOrigin, vec3 rayDirection ) {
+	// debug output for testing
+		float rayDistance = raymarch( rayOrigin, rayDirection );
+		vec3 pHit = rayOrigin + rayDistance * rayDirection;
+		if( de( rayOrigin + rayDistance * rayDirection ) < epsilon )
+			return hitpointDiffuse;
+		else
+			return vec3( 0.0 );
+
+
 	// loop to max bounces
 
-	float rayDistance = raymarch( rayOrigin, rayDirection );
-	vec3 pHit = rayOrigin + rayDistance * rayDirection;
-	// vec3 surfaceDiffuse = hitpointDiffuse;
 
-	if( de( rayOrigin + rayDistance * rayDirection ) < epsilon )
-		// return surfaceDiffuse * calcAO( pHit, normal( pHit ) );
-		return hitpointDiffuse;
-	else
-		return vec3( 0.0 );
+
+
+
 }
 
 
 void storeNormalAndDepth( vec3 normal, float depth ) {
 	// blend with history and imageStore
+	vec4 prevResult = imageLoad( accumulatorNormalsAndDepth, location );
+	vec4 blendResult = mix( prevResult, vec4( normal, depth ), 1.0 / sampleCount );
+	imageStore( accumulatorNormalsAndDepth, location, blendResult );
 }
 
 vec3 pathtraceSample( ivec2 location ) {
@@ -301,7 +305,9 @@ vec3 pathtraceSample( ivec2 location ) {
 			rayOrigin += diskOffset.x * basisX + diskOffset.y * basisY + thinLensIntensity * randomFloat() * basisZ;
 			rayDirection = normalize( focuspoint - rayOrigin );
 
-			// get depth and normals - move this to the colorSample function? - think about special handling for refractive hits
+			// get depth and normals - think about special handling for refractive hits
+			float distanceToFirstHit = raymarch( rayOrigin, rayDirection );
+			storeNormalAndDepth( normal( rayOrigin + distanceToFirstHit * rayDirection ), distanceToFirstHit );
 
 			// get the result for a ray
 			cResult += colorSample( rayOrigin, rayDirection );
