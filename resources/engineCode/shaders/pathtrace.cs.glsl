@@ -78,29 +78,19 @@ vec2 randomInUnitDisk() {
 }
 
 
-// float de(vec3 p){
-// 	#define M(a)mat2(cos(a+vec4(0,2,5,0)))
-// 	#define F1(a)for(int j=0;j<5;j++)p.a=abs(p.a*M(3.));(p.a).y-=3.
-// 	float t = 0.96;
-// 	p.z-=9.;
-// 	p.xz*=M(t);
-// 	F1(xy);
-// 	F1(zy);
-// 	return dot(abs(p),vec3(.3))-.5;
-// }
-
 vec3 hitpointColor = vec3( 0.0 );
 
 // 0 nohit
 #define NOHIT 0
 // 1 diffuse
 #define DIFFUSE 1
-// 2 emissive
-#define EMISSIVE 2
+// 2 specular
+#define SPECULAR 2
+// 3 emissive
+#define EMISSIVE 3
 
 // identifier for the hit surface
 int hitpointSurfaceType = 0;
-
 
 void pR( inout vec2 p, float a ) {
 	p = cos( a ) * p + sin( a ) * vec2( p.y, -p.x );
@@ -130,6 +120,19 @@ float deFractal(vec3 p){
 		l =pow(p6.x + p6.y + p6.z, 1./6.);
 	}
 	return ( l * pow( scale, -float( iterations ) ) - 0.15 ) * scalar;
+}
+
+float deFractal2( vec3 p ){
+	float scalar = 0.1;
+	p /= scalar;
+	#define M(a) mat2(cos(a+vec4(0,2,5,0)))
+	#define F1(a) for(int j=0;j<5;j++)p.a=abs(p.a*M(3.0));(p.a).y-=3.0
+	float t = 0.96;
+	p.z-=9.0;
+	p.xz*=M(t);
+	F1(xy);
+	F1(zy);
+	return ( dot( abs( p ), vec3( 0.3 ) ) - 0.5 ) * scalar;
 }
 
 float dePlane( vec3 p, vec3 normal, float distanceFromOrigin ) {
@@ -173,9 +176,18 @@ float de( vec3 p ) {
 	sceneDist = min( dFractal, sceneDist );
 	if( sceneDist == dFractal && dFractal <= epsilon ) {
 		// hitpointColor = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 10.0 );
-		hitpointColor = vec3( 0.618 );
-		hitpointSurfaceType = DIFFUSE;
+		// hitpointColor = vec3( 0.618 );
+		hitpointColor = vec3( 0.618, 0.362, 0.04 );
+		hitpointSurfaceType = SPECULAR;
 	}
+
+	// second fractal object
+	// float dFractal2 = deFractal2( p );
+	// sceneDist = min( dFractal2, sceneDist );
+	// if( sceneDist == dFractal2 && dFractal2 <= epsilon ) {
+	// 	hitpointColor = vec3( 0.618, 0.362, 0.04 );
+	// 	hitpointSurfaceType = SPECULAR;
+	// }
 
 	// cieling and floor
 	float dFloorCieling = min( dePlane( p, vec3( 0.0, -1.0, 0.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 1.0, 0.0 ), 5.0 ) );
@@ -188,7 +200,7 @@ float de( vec3 p ) {
 	float dLightBall = distance( p, vec3( 0.0, 6.0, 0.0 ) ) - 2.0;
 	sceneDist = min( dLightBall, sceneDist );
 	if( sceneDist == dLightBall && dLightBall <= epsilon ) {
-		hitpointColor = vec3( 1.0 );
+		hitpointColor = vec3( 5.0 );
 		hitpointSurfaceType = EMISSIVE;
 	}
 
@@ -288,22 +300,35 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 			// now you are at least epsilon distance from the surface, so you won't immediately hit
 		rayOrigin += 2.0 * epsilon * hitNormal;
 
+	// these are mixed per-material
 		// construct new rayDirection vector, diffuse reflection off the surface
 		vec3 reflectedVector = reflect( previousRayDirection, hitNormal );
-		rayDirection = normalize( ( 1.0 + epsilon ) * hitNormal + randomUnitVector() );
+
+		vec3 randomVectorDiffuse = normalize( ( 1.0 + epsilon ) * hitNormal + randomUnitVector() );
+		vec3 randomVectorSpecular = normalize( ( 1.0 + epsilon ) * hitNormal + mix( reflectedVector, randomUnitVector(), 0.1 ) );
+
 
 		// currently just implementing diffuse and emissive behavior
 			// eventually add different ray behaviors for each material here
 		switch ( hitpointSurfaceType ) {
+
 			case EMISSIVE:
 				finalColor += throughput * hitpointColor;
 				break;
+
 			case DIFFUSE:
+				rayDirection = randomVectorDiffuse;
+				throughput *= hitpointColor; // attenuate throughput by surface albedo
+				break;
+
+			case SPECULAR:
+				rayDirection = mix( randomVectorDiffuse, randomVectorSpecular, 0.7 );
 				throughput *= hitpointColor;
 				break;
 
 			default:
 				break;
+
 		}
 
 		// TODO: russian roulette termination

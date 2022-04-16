@@ -74,8 +74,8 @@ void engine::pathtrace() {
 	glGetQueryObjectui64v( queryID[ 0 ], GL_QUERY_RESULT, &startTime );
 
 	// used for the wang hash seeding, as well as the noise offset
-	std::default_random_engine gen;
-	std::uniform_int_distribution< int > dist( 0, std::numeric_limits< int >::max() / 4 );
+	static std::default_random_engine gen;
+	static std::uniform_int_distribution< int > dist( 0, std::numeric_limits< int >::max() / 4 );
 
 	int tilesCompleted = 0;
 	float looptime = 0.;
