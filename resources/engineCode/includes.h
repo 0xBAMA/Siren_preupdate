@@ -92,8 +92,8 @@ using json = nlohmann::json;
 #define HEIGHT 1080 / 2																			// height of the texture that the tiles render to
 
 #define PERFORMANCEHISTORY 250															// how many datapoints to keep for tile count / fps
-#define TILESIZE 32																					// play around with this - higher seems to be higher perf, but more frame latency - set to 256 or more on desktop and let er rip
-// #define TILESIZE 256
+// #define TILESIZE 32																					// play around with this - higher seems to be higher perf, but more frame latency - set to 256 or more on desktop and let er rip
+#define TILESIZE 256
 
 struct hostParameters {
 	int screenshotDim = WIDTH; 																// width of the screenshot - the code maintains the aspect ratio of HEIGHT/WIDTH
