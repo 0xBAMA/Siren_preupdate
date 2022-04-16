@@ -81,40 +81,6 @@ vec2 randomInUnitDisk() {
 }
 
 
-
-// surface distance estimate for the lens
-float lensDE( vec3 p ) {
-	return 0.0; // currently placeholder
-}
-
-// normalized gradient of the SDF - 3 different methods
-vec3 lensNorm( vec3 p ) {
-	vec2 e;
-	switch( normalMethod ) {
-
-		case 0: // tetrahedron version, unknown original source - 4 DE evaluations
-			e = vec2( 1.0, -1.0 ) * epsilon;
-			return normalize( e.xyy * lensDE( p + e.xyy ) + e.yyx * lensDE( p + e.yyx ) + e.yxy * lensDE( p + e.yxy ) + e.xxx * lensDE( p + e.xxx ) );
-			break;
-
-		case 1: // from iq = more efficient, 4 DE evaluations
-			e = vec2( epsilon, 0.0 );
-			return normalize( vec3( lensDE( p ) ) - vec3( lensDE( p - e.xyy ), lensDE( p - e.yxy ), lensDE( p - e.yyx ) ) );
-			break;
-
-		case 2: // from iq - less efficient, 6 DE evaluations
-			e = vec2( epsilon, 0.0 );
-			return normalize( vec3( lensDE( p + e.xyy ) - lensDE( p - e.xyy ), lensDE( p + e.yxy ) - lensDE( p - e.yxy ), lensDE( p + e.yyx ) - lensDE( p - e.yyx ) ) );
-			break;
-
-		default:
-			break;
-	}
-}
-
-
-// surface distance estimate for the whole scene
-
 // float de(vec3 p){
 // 	#define M(a)mat2(cos(a+vec4(0,2,5,0)))
 // 	#define F1(a)for(int j=0;j<5;j++)p.a=abs(p.a*M(3.));(p.a).y-=3.
@@ -173,6 +139,7 @@ float dePlane( vec3 p, vec3 normal, float distanceFromOrigin ) {
 	return dot( p, normal ) + distanceFromOrigin;
 }
 
+// surface distance estimate for the whole scene
 float de( vec3 p ) {
 	// init nohit, far from surface, no diffuse color
 	hitpointSurfaceType = NOHIT;
@@ -208,7 +175,8 @@ float de( vec3 p ) {
 	float dFractal = deFractal( p );
 	sceneDist = min( dFractal, sceneDist );
 	if( sceneDist == dFractal && dFractal <= epsilon ) {
-		hitpointDiffuse = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 20.0 ) * 2.0;
+		// hitpointDiffuse = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 10.0 );
+		hitpointDiffuse = vec3( 0.618 );
 		hitpointSurfaceType = DIFFUSE;
 	}
 
@@ -292,10 +260,11 @@ vec3 colorSample( vec3 rayOrigin, vec3 rayDirection ) {
 
 	float rayDistance = raymarch( rayOrigin, rayDirection );
 	vec3 pHit = rayOrigin + rayDistance * rayDirection;
-	vec3 surfaceDiffuse = hitpointDiffuse;
+	// vec3 surfaceDiffuse = hitpointDiffuse;
 
 	if( de( rayOrigin + rayDistance * rayDirection ) < epsilon )
-		return surfaceDiffuse * calcAO( pHit, normal( pHit ) );
+		// return surfaceDiffuse * calcAO( pHit, normal( pHit ) );
+		return hitpointDiffuse;
 	else
 		return vec3( 0.0 );
 }
