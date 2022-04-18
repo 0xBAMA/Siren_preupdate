@@ -6,20 +6,20 @@ layout( binding = 1, rgba32f ) uniform image2D accumulatorColor;
 layout( binding = 2, rgba32f ) uniform image2D accumulatorNormal;
 
 void main() {
-  // this isn't tiled - it may need to be, for when rendering larger resolution screenshots
-  ivec2 location = ivec2( gl_GlobalInvocationID.xy );
+	// this isn't tiled - it may need to be, for when rendering larger resolution screenshots
+	ivec2 location = ivec2( gl_GlobalInvocationID.xy );
 
-  // Color comes in at 32-bit per channel precision
-  vec4 toStore = imageLoad( accumulatorColor, location );
+	// Color comes in at 32-bit per channel precision
+	vec4 toStore = imageLoad( accumulatorColor, location );
 
-  // RGB is normal, A is depth value, 32-bit per channel
-  vec4 normalAndDepth = imageLoad( accumulatorNormal, location );
+	// RGB is normal, A is depth value, 32-bit per channel
+	vec4 normalAndDepth = imageLoad( accumulatorNormal, location );
 
-  // do any postprocessing work, store back in display texture
-    // this is things like:
-    //  - depth fog
-    //  - tonemapping
-    //  - dithering
+	// do any postprocessing work, store back in display texture
+		// this is things like:
+		//	- depth fog
+		//	- tonemapping
+		//	- dithering
 
-  imageStore( display, location, uvec4( toStore.xyz * 255.0, 255 ) );
+	imageStore( display, location, uvec4( toStore.xyz * 255.0, 255 ) );
 }

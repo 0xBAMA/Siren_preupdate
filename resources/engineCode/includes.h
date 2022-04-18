@@ -126,7 +126,6 @@ struct lensParameters {
 	float lensThickness = 0.3;																// amount by which the spheres are offset from one another, before intersection
 	float lensRotate = 0.0;																		// rotates the lens - should this be done this way, or two points? maybe a quaternion
 	float lensIOR = 1.2;																			// index of refraction of the lens material
-	int lensNormalMethod = 0;																	// method by which to determine the surface normal of the lens SDF - this may eventually be picked and hardcoded
 };
 
 struct postParameters {
@@ -135,6 +134,8 @@ struct postParameters {
 	int ditherPattern = 0;																		// pattern used to dither the output
 	int tonemapMode = 0;																			// tonemap curve to use
 	int depthMode = 0;																				// depth fog method
-	float depthScale = 0.0;																		// scalar for depth term
+	float depthScale = 0.0;																		// scalar for depth term, when computing depth effects ( fog )
+	float gamma = 1.6;																				// gamma correction term for the color result
+	int displayType = 0;																			// mode selector - show normals, show depth, show color, show postprocessed version
 };
 #endif

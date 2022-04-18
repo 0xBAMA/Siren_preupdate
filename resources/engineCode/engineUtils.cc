@@ -45,15 +45,12 @@ void engine::pathtraceUniformUpdate() {
 	glUniform3f( glGetUniformLocation( pathtraceShader, "basisY"), core.basisY.x, core.basisY.y, core.basisY.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "basisZ"), core.basisZ.x, core.basisZ.y, core.basisZ.z );
 
-// TBD, not priority right now
-	// // lens parameters
-	// float lensScaleFactor;  // scales the lens DE
-	// float lensRadius1;      // radius of the sphere for the first side
-	// float lensRadius2;      // radius of the sphere for the second side
-	// float lensThickness;    // offset between the two spheres
-	// float lensRotate;       // rotating the displacement offset betwee spheres
-	// float lensIOR;          // index of refraction for the lens
-	// int lensNormalMethod;	 // should this just be picked as constant?
+	glUniform1f( glGetUniformLocation( pathtraceShader, "lensScaleFactor" ), lens.lensScaleFactor );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "lensRadius1" ), lens.lensRadius1 );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "lensRadius2" ), lens.lensRadius2 );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "lensThickness" ), lens.lensThickness );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "lensRotate" ), lens.lensRotate );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "lensIOR" ), lens.lensIOR );
 }
 
 void engine::pathtrace() {
@@ -216,9 +213,8 @@ void engine::imguiPass() {
 			ImGui::SliderFloat( "Lens Radius 1", &lens.lensRadius1, 0.01, 10.0 );
 			ImGui::SliderFloat( "Lens Radius 2", &lens.lensRadius2, 0.01, 10.0 );
 			ImGui::SliderFloat( "Lens Thickness", &lens.lensThickness, 0.01, 10.0 );
-			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -4.0, 4.0 );
+			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -35.0, 35.0 );
 			ImGui::SliderFloat( "Lens IOR", &lens.lensIOR, 0.0, 2.0 );
-			ImGui::SliderInt( "Lens Normal Method", &lens.lensNormalMethod, 0, 2 );
 			ImGui::EndTabItem();
 		}
 		if ( ImGui::BeginTabItem( " Post " ) ) {
@@ -231,6 +227,9 @@ void engine::imguiPass() {
 			ImGui::Separator();
 			ImGui::SliderInt( "Depth Fog Mode", &post.depthMode, 0, 8 ); // whatever the range ends up being
 			ImGui::SliderFloat( "Fog Depth Scalar", &post.depthScale, 0.01, 10.0 );
+			ImGui::SliderFloat( "Gamma Correction", &post.gamma, 0.01, 3.0 );
+			ImGui::SliderInt( "Display Type", &post.displayType, 0, 2 );
+
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();
@@ -297,8 +296,12 @@ void engine::handleEvents() {
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE && SDL_GetModState() & KMOD_SHIFT )
 			pQuit = true; // force quit on shift+esc ( bypasses confirm window )
 
-		// if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
-			// screenShot(); // this moves to the menu, triggered by a buttton - learned my lesson from Voraldo, accidentally triggering a heavy function during normal usage
+		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
+			basicScreenShot();	// do the big one via the menus, to avoid accidental trigger
+
+		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_p )
+			cout << to_string( core.viewerPosition );	// show current position of the viewer
+
 
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r )
 			resetAccumulators();
@@ -391,18 +394,23 @@ glm::ivec2 engine::getTile() {
 	return offsets[ listOffset ];
 }
 
+// this pulls the texture data from the accumulator and saves it to a PNG image with a timestamp
+void engine::basicScreenShot() {
+
+}
 
 // this is going to be a situation where we go from the regular render target, to a new render target, of some configured dimensions, up to what is supported by the driver
+// try to figure out how to make it not lock up while it's running
 const int result( int& val ){ glGetIntegerv( GL_MAX_TEXTURE_SIZE, &val ); return val; }
-void engine::screenShot() {
-	GLint val;
-	static const int maxTextureSize = result( val );
-	cout << "Max texture dimension: " << val << endl;
+void engine::offlineScreenShot() {
+	// GLint val;
+	// static const int maxTextureSize = result( val );
+	// cout << "Max texture dimension: " << val << endl;
 
 	// set to max of screenshotDim and maximum value
-	host.screenshotDim = std::min( maxTextureSize, host.screenshotDim );
-
-	cout << "Capturing at " << host.screenshotDim << " by " << static_cast< int > ( host.screenshotDim * ( float( HEIGHT ) / float( WIDTH ) ) ) << std::endl;
+	// host.screenshotDim = std::min( maxTextureSize, host.screenshotDim );
+	//
+	// cout << "Capturing at " << host.screenshotDim << " by " << static_cast< int > ( host.screenshotDim * ( float( HEIGHT ) / float( WIDTH ) ) ) << std::endl;
 
 	// create the texture, same aspect ratio as preview texture, but with the larger dimensions
 	// this is going to be configured in the menus and kept in the config structs

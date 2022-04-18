@@ -77,6 +77,31 @@ vec2 randomInUnitDisk() {
 	return randomUnitVector().xy;
 }
 
+mat3 rotate3D( float angle, vec3 axis ) {
+	vec3 a = normalize( axis );
+	float s = sin( angle );
+	float c = cos( angle );
+	float r = 1.0 - c;
+	return mat3(
+		a.x * a.x * r + c,
+		a.y * a.x * r + a.z * s,
+		a.z * a.x * r - a.y * s,
+		a.x * a.y * r - a.z * s,
+		a.y * a.y * r + c,
+		a.z * a.y * r + a.x * s,
+		a.x * a.z * r + a.y * s,
+		a.y * a.z * r - a.x * s,
+		a.z * a.z * r + c
+	);
+}
+
+
+float fOpIntersectionRound(float a, float b, float r) {
+	vec2 u = max(vec2(r + a,r + b), vec2(0));
+	return min(-r, max (a, b)) + length(u);
+}
+
+
 
 vec3 hitpointColor = vec3( 0.0 );
 
@@ -88,9 +113,28 @@ vec3 hitpointColor = vec3( 0.0 );
 #define SPECULAR 2
 // 3 emissive
 #define EMISSIVE 3
+// 4 refractive
+#define REFRACTIVE 4
 
 // identifier for the hit surface
 int hitpointSurfaceType = 0;
+
+// tracking global state wrt state of inside/outside lens material
+	// requires management that the lens material does not intersect with itself
+float refractState = 1.0; // multiply by the lens distance estimate, to invert when inside a refractive object
+float deLens( vec3 p ){
+	// lens SDF
+	p *= lensScaleFactor;
+	float dFinal;
+	float center1 = lensRadius1 - lensThickness / 2.0;
+	float center2 = -lensRadius2 + lensThickness / 2.0;
+	vec3 pRot = rotate3D( 0.1 * lensRotate, vec3( 1.0 ) ) * p;
+	float sphere1 = distance( pRot, vec3( 0.0, center1, 0.0 ) ) - lensRadius1;
+	float sphere2 = distance( pRot, vec3( 0.0, center2, 0.0 ) ) - lensRadius2;
+
+	dFinal = fOpIntersectionRound( sphere1, sphere2, 0.03 );
+	return dFinal / lensScaleFactor;
+}
 
 void pR( inout vec2 p, float a ) {
 	p = cos( a ) * p + sin( a ) * vec2( p.y, -p.x );
@@ -123,16 +167,21 @@ float deFractal(vec3 p){
 }
 
 float deFractal2( vec3 p ){
-	float scalar = 0.1;
-	p /= scalar;
-	#define M(a) mat2(cos(a+vec4(0,2,5,0)))
-	#define F1(a) for(int j=0;j<5;j++)p.a=abs(p.a*M(3.0));(p.a).y-=3.0
-	float t = 0.96;
-	p.z-=9.0;
-	p.xz*=M(t);
-	F1(xy);
-	F1(zy);
-	return ( dot( abs( p ), vec3( 0.3 ) ) - 0.5 ) * scalar;
+	float s = 2.;
+	float e = 0.;
+	for(int j=0;++j<7;)
+		p.xz=abs(p.xz)-2.3,
+		p.z>p.x?p=p.zyx:p,
+		p.z=1.5-abs(p.z-1.3+sin(p.z)*.2),
+		p.y>p.x?p=p.yxz:p,
+		p.x=3.-abs(p.x-5.+sin(p.x*3.)*.2),
+		p.y>p.x?p=p.yxz:p,
+		p.y=.9-abs(p.y-.4),
+		e=12.*clamp(.3/min(dot(p,p),1.),.0,1.)+
+		2.*clamp(.1/min(dot(p,p),1.),.0,1.),
+		p=e*p-vec3(7,1,1),
+		s*=e;
+	return length(p)/s;
 }
 
 float dePlane( vec3 p, vec3 normal, float distanceFromOrigin ) {
@@ -165,6 +214,7 @@ float de( vec3 p ) {
 
 	// white walls ( front and back )
 	float dWhiteWalls = min( dePlane( p, vec3( 0.0, 0.0, 1.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 0.0, -1.0 ), 10.0 ) );
+	// float dWhiteWalls = dePlane( p, vec3( 0.0, 0.0, 1.0 ), 10.0 );
 	sceneDist = min( dWhiteWalls, sceneDist );
 	if( sceneDist == dWhiteWalls && dWhiteWalls <= epsilon ) {
 		hitpointColor = vec3( 0.78 );
@@ -181,13 +231,13 @@ float de( vec3 p ) {
 		hitpointSurfaceType = SPECULAR;
 	}
 
-	// second fractal object
-	// float dFractal2 = deFractal2( p );
-	// sceneDist = min( dFractal2, sceneDist );
-	// if( sceneDist == dFractal2 && dFractal2 <= epsilon ) {
-	// 	hitpointColor = vec3( 0.618, 0.362, 0.04 );
-	// 	hitpointSurfaceType = SPECULAR;
-	// }
+	// lens object
+	float dLens = deLens( p );
+	sceneDist = min( dLens, sceneDist );
+	if( sceneDist == dLens && dLens <= epsilon ) {
+		hitpointColor = vec3( 0.11 );
+		hitpointSurfaceType = REFRACTIVE;
+	}
 
 	// cieling and floor
 	float dFloorCieling = min( dePlane( p, vec3( 0.0, -1.0, 0.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 1.0, 0.0 ), 5.0 ) );
@@ -326,13 +376,24 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 				throughput *= hitpointColor;
 				break;
 
+			case REFRACTIVE:
+				// ray refracts, instead of bouncing
+
+				// flip the sign to invert the lens material distance estimate, because the ray is either entering or leaving a refractive medium
+				refractState = -1.0 * refractState;
+				break;
+
 			default:
 				break;
 
 		}
 
-		// TODO: russian roulette termination
+		// russian roulette termination - chance for ray to quit early
+		float maxChannel = max( throughput.r, max( throughput.g, throughput.b ) );
+		if ( randomFloat() > maxChannel ) break;
 
+		// russian roulette compensation term
+		throughput *= 1.0 / maxChannel;
 	}
 
 	return finalColor;
@@ -364,7 +425,7 @@ vec3 pathtraceSample( ivec2 location ) {
 
 			// ray origin + direction
 			vec3 rayDirection = normalize( aspectRatio * mappedPosition.x * basisX + mappedPosition.y * basisY + ( 1.0 / FoV ) * basisZ );
-			vec3 rayOrigin    = viewerPosition;
+			vec3 rayOrigin    = viewerPosition + rayDirection * 0.1 * blueNoiseReference( location ).x;
 
 			// thin lens DoF - adjust view vectors to converge at focusDistance
 				// this is a small adjustment to the ray origin and direction - not working correctly - need to revist this

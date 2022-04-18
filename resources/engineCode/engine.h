@@ -42,10 +42,14 @@ private:
 	void imguiFrameStart();
 	void imguiFrameEnd();
 	void drawTextEditor();
-	void screenShot();
 	void resetAccumulators();
 	void quitConf( bool *open );
 	void HelpMarker( const char* message );
+
+
+	// screenshot functions
+	void basicScreenShot();		// pull render target from texture memory
+	void offlineScreenShot();	// render out with prescribed sample count + resolution
 
 	// rendering functions
 	void render(); 				// wrapper
