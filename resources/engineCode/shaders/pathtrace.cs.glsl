@@ -141,7 +141,7 @@ void pR( inout vec2 p, float a ) {
 }
 
 float deFractal(vec3 p){
-	float scalar = 0.25;
+	float scalar = 0.3;
 	p /= scalar;
 
 	const int iterations = 20;
@@ -378,6 +378,8 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 
 			case REFRACTIVE:
 				// ray refracts, instead of bouncing
+				// for now, perfect reflector
+				rayDirection = reflectedVector;
 
 				// flip the sign to invert the lens material distance estimate, because the ray is either entering or leaving a refractive medium
 				refractState = -1.0 * refractState;
@@ -429,10 +431,10 @@ vec3 pathtraceSample( ivec2 location ) {
 
 			// thin lens DoF - adjust view vectors to converge at focusDistance
 				// this is a small adjustment to the ray origin and direction - not working correctly - need to revist this
-			vec3 focuspoint = rayOrigin + ( ( rayDirection * focusDistance ) / dot( rayDirection, basisZ ) );
-			vec2 diskOffset = thinLensIntensity * randomInUnitDisk();
-			rayOrigin += diskOffset.x * basisX + diskOffset.y * basisY + thinLensIntensity * randomFloat() * basisZ;
-			rayDirection = normalize( focuspoint - rayOrigin );
+			// vec3 focuspoint = rayOrigin + ( ( rayDirection * focusDistance ) / dot( rayDirection, basisZ ) );
+			// vec2 diskOffset = thinLensIntensity * randomInUnitDisk();
+			// rayOrigin += diskOffset.x * basisX + diskOffset.y * basisY + thinLensIntensity * randomFloat() * basisZ;
+			// rayDirection = normalize( focuspoint - rayOrigin );
 
 			// get depth and normals - think about special handling for refractive hits
 			float distanceToFirstHit = raymarch( rayOrigin, rayDirection );
