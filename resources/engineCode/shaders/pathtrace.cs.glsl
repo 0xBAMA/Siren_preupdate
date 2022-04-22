@@ -101,6 +101,13 @@ float fOpIntersectionRound(float a, float b, float r) {
 	return min(-r, max (a, b)) + length(u);
 }
 
+// Repeat in two dimensions
+vec2 pMod2(inout vec2 p, vec2 size) {
+	vec2 c = floor((p + size*0.5)/size);
+	p = mod(p + size*0.5,size) - size*0.5;
+	return c;
+}
+
 
 
 vec3 hitpointColor = vec3( 0.0 );
@@ -124,7 +131,7 @@ int hitpointSurfaceType = 0;
 float refractState = 1.0; // multiply by the lens distance estimate, to invert when inside a refractive object
 float deLens( vec3 p ){
 	// lens SDF
-	p *= lensScaleFactor;
+	p /= lensScaleFactor;
 	float dFinal;
 	float center1 = lensRadius1 - lensThickness / 2.0;
 	float center2 = -lensRadius2 + lensThickness / 2.0;
@@ -132,8 +139,9 @@ float deLens( vec3 p ){
 	float sphere1 = distance( pRot, vec3( 0.0, center1, 0.0 ) ) - lensRadius1;
 	float sphere2 = distance( pRot, vec3( 0.0, center2, 0.0 ) ) - lensRadius2;
 
-	dFinal = fOpIntersectionRound( sphere1, sphere2, 0.03 );
-	return dFinal / lensScaleFactor;
+	// dFinal = fOpIntersectionRound( sphere1, sphere2, 0.03 );
+	dFinal = max( sphere1, sphere2 );
+	return dFinal * lensScaleFactor;
 }
 
 void pR( inout vec2 p, float a ) {
@@ -213,8 +221,8 @@ float de( vec3 p ) {
 	}
 
 	// white walls ( front and back )
-	float dWhiteWalls = min( dePlane( p, vec3( 0.0, 0.0, 1.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 0.0, -1.0 ), 10.0 ) );
-	// float dWhiteWalls = dePlane( p, vec3( 0.0, 0.0, 1.0 ), 10.0 );
+	// float dWhiteWalls = min( dePlane( p, vec3( 0.0, 0.0, 1.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 0.0, -1.0 ), 10.0 ) );
+	float dWhiteWalls = dePlane( p, vec3( 0.0, 0.0, 1.0 ), 10.0 ); // back only
 	sceneDist = min( dWhiteWalls, sceneDist );
 	if( sceneDist == dWhiteWalls && dWhiteWalls <= epsilon ) {
 		hitpointColor = vec3( 0.78 );
@@ -240,17 +248,18 @@ float de( vec3 p ) {
 	}
 
 	// cieling and floor
-	float dFloorCieling = min( dePlane( p, vec3( 0.0, -1.0, 0.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 1.0, 0.0 ), 5.0 ) );
+	float dFloorCieling = min( dePlane( p, vec3( 0.0, -1.0, 0.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 1.0, 0.0 ), 7.5 ) );
 	sceneDist = min( dFloorCieling, sceneDist );
 	if( sceneDist == dFloorCieling && dFloorCieling <= epsilon ) {
 		hitpointColor = vec3( 0.9 );
 		hitpointSurfaceType = DIFFUSE;
 	}
 
-	float dLightBall = distance( p, vec3( 0.0, 6.0, 0.0 ) ) - 2.0;
+	pMod2( p.xz, vec2( 2.5 ) );
+	float dLightBall = distance( p, vec3( 0.0, 7.5, 0.0 ) ) - 0.1618;
 	sceneDist = min( dLightBall, sceneDist );
 	if( sceneDist == dLightBall && dLightBall <= epsilon ) {
-		hitpointColor = vec3( 5.0 );
+		hitpointColor = vec3( 1.0 );
 		hitpointSurfaceType = EMISSIVE;
 	}
 

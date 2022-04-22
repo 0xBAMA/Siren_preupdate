@@ -88,11 +88,13 @@ void engine::pathtrace() {
 
 		// render the specified tile - dispatch
 		glDispatchCompute( TILESIZE / 16, TILESIZE / 16, 1 );
-		glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
+		// glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
+		glMemoryBarrier(  GL_ALL_BARRIER_BITS );
 		tilesCompleted++;
 
 		// check time, wait for query to be ready
 		glQueryCounter( queryID[ 1 ], GL_TIMESTAMP );
+		// glMemoryBarrier( GL_QUERY_BUFFER_BARRIER_BIT );
 		GLint checkTimeAvailable = 0;
 		while( !checkTimeAvailable )
 			glGetQueryObjectiv( queryID[ 1 ], GL_QUERY_RESULT_AVAILABLE, &checkTimeAvailable );
