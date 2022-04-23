@@ -44,6 +44,7 @@ void engine::pathtraceUniformUpdate() {
 	glUniform3f( glGetUniformLocation( pathtraceShader, "basisX"), core.basisX.x, core.basisX.y, core.basisX.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "basisY"), core.basisY.x, core.basisY.y, core.basisY.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "basisZ"), core.basisZ.x, core.basisZ.y, core.basisZ.z );
+	glUniform1f( glGetUniformLocation( pathtraceShader, "understep" ), core.understep );
 
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensScaleFactor" ), lens.lensScaleFactor );
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensRadius1" ), lens.lensRadius1 );
@@ -180,6 +181,10 @@ void engine::imguiPass() {
 			ImGui::Separator();
 			ImGui::SliderInt( "Tile Per Frame Cap", &host.tilePerFrameCap, 1, 3000 );
 
+			if( ImGui::SmallButton( "Framebuffer Screenshot" ) ) {
+				basicScreenShot();
+			}
+
 			// what else?
 			// buttons, controls for the renderer state
 				// trigger random tile glitch behaviors
@@ -192,6 +197,7 @@ void engine::imguiPass() {
 			ImGui::SliderInt( "Max Raymarch Steps", &core.maxSteps, 1, 500 );
 			ImGui::SliderInt( "Max Light Bounces", &core.maxBounces, 1, 50 );
 			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0, 1000.0 );
+			ImGui::SliderFloat( "Raymarch Understep", &core.understep, 0.1, 1.0 );
 			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001, 0.1 );
 			ImGui::Separator();
 			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1, 3.6 );
@@ -398,7 +404,32 @@ glm::ivec2 engine::getTile() {
 
 // this pulls the texture data from the accumulator and saves it to a PNG image with a timestamp
 void engine::basicScreenShot() {
+	std::vector< GLfloat > imageAsFloats;
+	imageAsFloats.resize( WIDTH * HEIGHT * 4, 0 );
 
+	glBindTexture( GL_TEXTURE_2D, colorAccumulatorTexture );
+	glGetTexImage( GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, &imageAsFloats[ 0 ] );
+
+	// go from float to uint
+	std::vector< unsigned char > imageAsBytes;
+	imageAsBytes.reserve( WIDTH * HEIGHT * 4 );
+	for( unsigned int i = 0; i < imageAsFloats.size(); i++ ) {
+		// cout << imageAsFloats[ i ] << endl;
+		imageAsBytes.push_back( imageAsFloats[ i ] * 255.0 );
+	}
+
+	// get timestamp and save
+	auto now = std::chrono::system_clock::now();
+	auto in_time_t = std::chrono::system_clock::to_time_t( now );
+
+	std::stringstream ss;
+	ss << std::put_time(std::localtime(&in_time_t), "Screenshot-%Y-%m-%d %X") << ".png";
+	std::string filename = ss.str();
+
+	unsigned error;
+	if ( ( error = lodepng::encode( filename.c_str(), imageAsBytes, WIDTH, HEIGHT ))) {
+		std::cout << "encode error during save(\" " + filename + " \") " << error << ": " << lodepng_error_text( error ) << std::endl;
+	}
 }
 
 // this is going to be a situation where we go from the regular render target, to a new render target, of some configured dimensions, up to what is supported by the driver

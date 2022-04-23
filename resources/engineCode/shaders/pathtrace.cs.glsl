@@ -14,6 +14,7 @@ uniform ivec2	noiseOffset;				// jitters the noise sample read locations
 uniform int		maxSteps;						// max steps to hit
 uniform int		maxBounces;					// number of pathtrace bounces
 uniform float	maxDistance;				// maximum ray travel
+uniform float understep;					// scale factor on distance, when added as raymarch step
 uniform float	epsilon;						// how close is considered a surface hit
 uniform int		normalMethod;				// selector for normal computation method
 uniform float	focusDistance;			// for thin lens approx
@@ -196,6 +197,72 @@ float dePlane( vec3 p, vec3 normal, float distanceFromOrigin ) {
 	return dot( p, normal ) + distanceFromOrigin;
 }
 
+// Jos Leys / Knighty
+// https://www.shadertoy.com/view/XlVXzh
+vec2 wrap(vec2 x, vec2 a, vec2 s){
+    x -= s;
+    return (x-a*floor(x/a)) + s;
+}
+
+void TransA(inout vec3 z, inout float DF, float a, float b){
+    float iR = 1. / dot(z,z);
+    z *= -iR;
+    z.x = -b - z.x; z.y = a + z.y;
+    DF *= max(1.,iR);
+}
+
+float JosKleinian(vec3 z) {
+    float adjust = 6.28; // use this for time varying behavior
+
+    float box_size_x=1.;
+    float box_size_z=1.;
+
+    float KleinR = 1.94+0.05*abs(sin(-adjust*0.5));//1.95859103011179;
+    float KleinI = 0.03*cos(-adjust*0.5);//0.0112785606117658;
+    vec3 lz=z+vec3(1.), llz=z+vec3(-1.);
+    float d=0.; float d2=0.;
+
+    vec3 InvCenter=vec3(1.0,1.0,0.);
+    float rad=0.8;
+    z=z-InvCenter;
+    d=length(z);
+    d2=d*d;
+    z=(rad*rad/d2)*z+InvCenter;
+
+    float DE=1e10;
+    float DF = 1.0;
+    float a = KleinR;
+    float b = KleinI;
+    float f = sign(b)*1. ;
+    for (int i = 0; i < 69 ; i++)
+    {
+        z.x=z.x+b/a*z.y;
+        z.xz = wrap(z.xz, vec2(2. * box_size_x, 2. * box_size_z), vec2(- box_size_x, - box_size_z));
+        z.x=z.x-b/a*z.y;
+
+        //If above the separation line, rotate by 180° about (-b/2, a/2)
+        if  (z.y >= a * 0.5 + f *(2.*a-1.95)/4. * sign(z.x + b * 0.5)* (1. - exp(-(7.2-(1.95-a)*15.)* abs(z.x + b * 0.5))))
+        {z = vec3(-b, a, 0.) - z;}
+
+        //Apply transformation a
+        TransA(z, DF, a, b);
+
+        //If the iterated points enters a 2-cycle , bail out.
+        if(dot(z-llz,z-llz) < 1e-5) {break;}
+
+        //Store prévious iterates
+        llz=lz; lz=z;
+    }
+
+
+    float y =  min(z.y, a-z.y) ;
+    DE=min(DE,min(y,0.3)/max(DF,2.));
+    DE=DE*d2/(rad+d*DE);
+    return DE;
+}
+
+
+
 // surface distance estimate for the whole scene
 float de( vec3 p ) {
 	// init nohit, far from surface, no diffuse color
@@ -221,16 +288,17 @@ float de( vec3 p ) {
 	}
 
 	// white walls ( front and back )
-	// float dWhiteWalls = min( dePlane( p, vec3( 0.0, 0.0, 1.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 0.0, -1.0 ), 10.0 ) );
-	float dWhiteWalls = dePlane( p, vec3( 0.0, 0.0, 1.0 ), 10.0 ); // back only
-	sceneDist = min( dWhiteWalls, sceneDist );
-	if( sceneDist == dWhiteWalls && dWhiteWalls <= epsilon ) {
-		hitpointColor = vec3( 0.78 );
-		hitpointSurfaceType = DIFFUSE;
-	}
+	// float dWhiteWalls = min( dePlane( p, vec3( 0.0, 0.0, 1.0 ), 20.0 ),  dePlane( p, vec3( 0.0, 0.0, -1.0 ), 20.0 ) );
+	// // float dWhiteWalls = dePlane( p, vec3( 0.0, 0.0, 1.0 ), 16.0 ); // back only
+	// sceneDist = min( dWhiteWalls, sceneDist );
+	// if( sceneDist == dWhiteWalls && dWhiteWalls <= epsilon ) {
+	// 	hitpointColor = vec3( 0.78 );
+	// 	hitpointSurfaceType = DIFFUSE;
+	// }
 
 	// fractal object
-	float dFractal = deFractal( p );
+	// float dFractal = deFractal( p );
+	float dFractal = JosKleinian( p );
 	sceneDist = min( dFractal, sceneDist );
 	if( sceneDist == dFractal && dFractal <= epsilon ) {
 		// hitpointColor = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 10.0 );
@@ -240,22 +308,23 @@ float de( vec3 p ) {
 	}
 
 	// lens object
-	float dLens = deLens( p );
-	sceneDist = min( dLens, sceneDist );
-	if( sceneDist == dLens && dLens <= epsilon ) {
-		hitpointColor = vec3( 0.11 );
-		hitpointSurfaceType = REFRACTIVE;
-	}
+	// float dLens = deLens( p );
+	// sceneDist = min( dLens, sceneDist );
+	// if( sceneDist == dLens && dLens <= epsilon ) {
+	// 	hitpointColor = vec3( 0.11 );
+	// 	hitpointSurfaceType = REFRACTIVE;
+	// }
 
 	// cieling and floor
-	float dFloorCieling = min( dePlane( p, vec3( 0.0, -1.0, 0.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 1.0, 0.0 ), 7.5 ) );
+	// float dFloorCieling = min( dePlane( p, vec3( 0.0, -1.0, 0.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 1.0, 0.0 ), 7.5 ) );
+	float dFloorCieling = dePlane( p, vec3( 0.0, 1.0, 0.0 ), 10.0 );
 	sceneDist = min( dFloorCieling, sceneDist );
 	if( sceneDist == dFloorCieling && dFloorCieling <= epsilon ) {
 		hitpointColor = vec3( 0.9 );
 		hitpointSurfaceType = DIFFUSE;
 	}
 
-	pMod2( p.xz, vec2( 2.5 ) );
+	pMod2( p.xz, vec2( 2.0 ) );
 	float dLightBall = distance( p, vec3( 0.0, 7.5, 0.0 ) ) - 0.1618;
 	sceneDist = min( dLightBall, sceneDist );
 	if( sceneDist == dLightBall && dLightBall <= epsilon ) {
@@ -288,12 +357,12 @@ vec3 normal( vec3 p ) {
 	switch( normalMethod ) {
 
 		case 0: // tetrahedron version, unknown original source - 4 DE evaluations
-			e = vec2( 1.0, -1.0 ) * epsilon;
+			e = vec2( 1.0, -1.0 ) * epsilon / 10.0;
 			return normalize( e.xyy * de( p + e.xyy ) + e.yyx * de( p + e.yyx ) + e.yxy * de( p + e.yxy ) + e.xxx * de( p + e.xxx ) );
 			break;
 
 			case 1: // from iq = more efficient, 4 DE evaluations
-				e = vec2( epsilon, 0.0 );
+				e = vec2( epsilon, 0.0 ) / 10.0;
 				return normalize( vec3( de( p ) ) - vec3( de( p - e.xyy ), de( p - e.yxy ), de( p - e.yyx ) ) );
 				break;
 
@@ -314,7 +383,7 @@ float raymarch( vec3 origin, vec3 direction ) {
 	for ( int steps = 0; steps < maxSteps; steps++ ) {
 		vec3 pQuery = origin + dTotal * direction;
 		dQuery = de( pQuery );
-		dTotal += dQuery;
+		dTotal += dQuery * understep;
 		if ( dTotal > maxDistance || abs( dQuery ) < epsilon ) {
 			break;
 		}
@@ -343,6 +412,11 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 	vec3 finalColor = vec3( 0.0 );
 	vec3 throughput = vec3( 1.0 );
 
+	// jitter ray starting point
+	float startJitterScaleFactor = 0.1;
+	vec4 blue = blueNoiseReference( location );
+	rayOrigin += rayDirection * blue.x * startJitterScaleFactor;
+
 	// loop to max bounces
 	for( int bounce = 0; bounce < maxBounces; bounce++ ) {
 		float dResult = raymarch( rayOrigin, rayDirection );
@@ -357,7 +431,7 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 
 		// bump rayOrigin along the normal to prevent false positive hit on next bounce
 			// now you are at least epsilon distance from the surface, so you won't immediately hit
-		rayOrigin += 2.0 * epsilon * hitNormal;
+		rayOrigin += ( 2.0 + 0.1 * blue.y - 0.05 ) * epsilon * hitNormal; // jitter slightly
 
 	// these are mixed per-material
 		// construct new rayDirection vector, diffuse reflection off the surface

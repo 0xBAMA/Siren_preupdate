@@ -88,12 +88,12 @@ using json = nlohmann::json;
 // #define WIDTH 640
 // #define HEIGHT 480
 
-#define WIDTH  1920 / 3																			// width of the texture that the tiles render to
-#define HEIGHT 1080 / 3																			// height of the texture that the tiles render to
+#define WIDTH  1920 / ( 2.0 / 3.0 )																			// width of the texture that the tiles render to
+#define HEIGHT 1080 / ( 2.0 / 3.0 )																			// height of the texture that the tiles render to
 
 #define PERFORMANCEHISTORY 250															// how many datapoints to keep for tile count / fps
 // #define TILESIZE 32																					// play around with this - higher seems to be higher perf, but more frame latency - set to 256 or more on desktop and let er rip
-#define TILESIZE 128
+#define TILESIZE 256
 
 struct hostParameters {
 	int screenshotDim = WIDTH; 																// width of the screenshot - the code maintains the aspect ratio of HEIGHT/WIDTH
@@ -117,6 +117,7 @@ struct coreParameters {
 	glm::vec3 basisX = glm::vec3( 1.0, 0.0, 0.0 );						// basis vectors are used to control viewer movement and rotation, as well as create the camera
 	glm::vec3 basisY = glm::vec3( 0.0, 1.0, 0.0 );
 	glm::vec3 basisZ = glm::vec3( 0.0, 0.0, 1.0 );
+	float understep = 0.618;																	// scale factor on distance estimate when applied to the step during marching - lower is slower, as more steps are taken before reaching the surface
 };
 
 struct lensParameters {
