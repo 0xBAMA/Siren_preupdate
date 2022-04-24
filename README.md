@@ -1,5 +1,7 @@
 # Built on [NQADE](https://github.com/0xBAMA/not-quite-a-demo-engine)
 
+![ SDF Pathtracing ]( SirenExample.png )
+
 ## Setup
 - Requires `libsdl2-dev` on Ubuntu.
 - Make sure to recurse submodules to pull in FastNoise2 code - `git submodule update --init --recursive`, alternatively just run scripts/init.sh to do the same thing. FastNoise2 may be removed, as I don't think it's particularly relevant to this project.

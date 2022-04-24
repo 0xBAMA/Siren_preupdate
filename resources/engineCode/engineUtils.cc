@@ -304,8 +304,8 @@ void engine::handleEvents() {
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE && SDL_GetModState() & KMOD_SHIFT )
 			pQuit = true; // force quit on shift+esc ( bypasses confirm window )
 
-		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
-			basicScreenShot();	// do the big one via the menus, to avoid accidental trigger
+		// if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
+		// 	basicScreenShot();	// do the big one via the menus, to avoid accidental trigger
 
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_p )
 			cout << to_string( core.viewerPosition );	// show current position of the viewer
@@ -316,32 +316,32 @@ void engine::handleEvents() {
 
 		// quaternion based rotation via retained state in the basis vectors - much easier to use than the arbitrary euler angles
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w ) {
-			glm::quat rot = glm::angleAxis( -0.1f, core.basisX );	// basisX is the axis, therefore remains untransformed
+			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisX );	// basisX is the axis, therefore remains untransformed
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s ) {
-			glm::quat rot = glm::angleAxis(  0.1f, core.basisX );
+			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisX );
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a ) {
-			glm::quat rot = glm::angleAxis( -0.1f, core.basisY );	// same as above, but basisY is the axis
+			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisY );	// same as above, but basisY is the axis
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d ) {
-			glm::quat rot = glm::angleAxis(  0.1f, core.basisY );
+			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisY );
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q ) {
-			glm::quat rot = glm::angleAxis( -0.1f, core.basisZ ); // and again for basisZ
+			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisZ ); // and again for basisZ
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e ) {
-			glm::quat rot = glm::angleAxis(  0.1f, core.basisZ );
+			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisZ );
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
 		}
@@ -358,22 +358,22 @@ void engine::handleEvents() {
 		}
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP )
-			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisZ;
+			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisZ;
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_DOWN )
-			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisZ;
+			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisZ;
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RIGHT )
-			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisX;
+			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisX;
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_LEFT )
-			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisX;
+			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisX;
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEUP )
-			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisY;
+			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisY;
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEDOWN )
-			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.005f : 0.07f ) * core.basisY;
+			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisY;
 
 	}
 }
@@ -407,15 +407,45 @@ void engine::basicScreenShot() {
 	std::vector< GLfloat > imageAsFloats;
 	imageAsFloats.resize( WIDTH * HEIGHT * 4, 0 );
 
-	glBindTexture( GL_TEXTURE_2D, colorAccumulatorTexture );
-	glGetTexImage( GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, &imageAsFloats[ 0 ] );
+	// belt and suspenders, what's 100ms between friends?
+	SDL_Delay( 30 );
+	glMemoryBarrier(  GL_ALL_BARRIER_BITS );
+	SDL_Delay( 30 );
+	glMemoryBarrier(  GL_ALL_BARRIER_BITS );
 
-	// go from float to uint
+	// get the image data ( floating point accumulator )
+	// glBindTexture( GL_TEXTURE_2D, colorAccumulatorTexture );
+	// glGetTexImage( GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, &imageAsFloats[ 0 ] );
+
 	std::vector< unsigned char > imageAsBytes;
 	imageAsBytes.reserve( WIDTH * HEIGHT * 4 );
-	for( unsigned int i = 0; i < imageAsFloats.size(); i++ ) {
-		// cout << imageAsFloats[ i ] << endl;
-		imageAsBytes.push_back( imageAsFloats[ i ] * 255.0 );
+
+	// go from float to uint
+	// for( unsigned int i = 0; i < imageAsFloats.size(); i += 4 ) {
+	// 	// alpha channel is accumulator - not good data
+	//
+	//
+	// 	// tonemapping needs to be done to bring the data into the expected range
+	//
+	//
+	// 	imageAsBytes.push_back( std::clamp( imageAsFloats[ i + 0 ] * 255.0, 0.0, 255.0 ) );
+	// 	imageAsBytes.push_back( std::clamp( imageAsFloats[ i + 1 ] * 255.0, 0.0, 255.0 ) );
+	// 	imageAsBytes.push_back( std::clamp( imageAsFloats[ i + 2 ] * 255.0, 0.0, 255.0 ) );
+	// 	imageAsBytes.push_back( 255 );
+	// }
+
+	glBindTexture( GL_TEXTURE_2D, displayTexture );
+	glGetTexImage( GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageAsBytes[ 0 ] );
+
+	// reorder the pixels, as the image coming from the GPU will be upside down
+	std::vector< unsigned char > outputBytes;
+	outputBytes.resize( WIDTH * HEIGHT * 4 );
+	for ( int x = 0; x < WIDTH; x++ ) {
+		for ( int y = 0; y < HEIGHT; y++ ) {
+			for ( int c = 0; c < 4; c++ ) {
+				outputBytes[ ( ( x + y * WIDTH ) * 4 ) + c ] = imageAsBytes[ ( ( WIDTH - x - 1 ) + ( HEIGHT - y - 1 ) * WIDTH ) * 4 + c ];
+			}
+		}
 	}
 
 	// get timestamp and save
@@ -427,7 +457,7 @@ void engine::basicScreenShot() {
 	std::string filename = ss.str();
 
 	unsigned error;
-	if ( ( error = lodepng::encode( filename.c_str(), imageAsBytes, WIDTH, HEIGHT ))) {
+	if ( ( error = lodepng::encode( filename.c_str(), outputBytes, WIDTH, HEIGHT ))) {
 		std::cout << "encode error during save(\" " + filename + " \") " << error << ": " << lodepng_error_text( error ) << std::endl;
 	}
 }

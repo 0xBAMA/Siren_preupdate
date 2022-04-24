@@ -88,8 +88,8 @@ using json = nlohmann::json;
 // #define WIDTH 640
 // #define HEIGHT 480
 
-#define WIDTH  1920 / ( 2.0 / 3.0 )																			// width of the texture that the tiles render to
-#define HEIGHT 1080 / ( 2.0 / 3.0 )																			// height of the texture that the tiles render to
+#define WIDTH  1920 * 2																			// width of the texture that the tiles render to
+#define HEIGHT 1080 * 2																			// height of the texture that the tiles render to
 
 #define PERFORMANCEHISTORY 250															// how many datapoints to keep for tile count / fps
 // #define TILESIZE 32																					// play around with this - higher seems to be higher perf, but more frame latency - set to 256 or more on desktop and let er rip
