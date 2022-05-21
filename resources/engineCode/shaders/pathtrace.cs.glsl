@@ -6,7 +6,7 @@ layout( binding = 2, rgba32f ) uniform image2D accumulatorNormalsAndDepth;
 layout( binding = 3, rgba8ui ) uniform uimage2D blueNoise;
 
 #define PI 3.1415926535897932384626433832795
-#define AA 2 // each sample is actually 2*2 = 4 offset samples
+#define AA 1 // each sample is actually 2*2 = 4 offset samples
 
 // core rendering stuff
 uniform ivec2	tileOffset;					// tile renderer offset for the current tile
@@ -199,46 +199,149 @@ float dePlane( vec3 p, vec3 normal, float distanceFromOrigin ) {
 
 // Jos Leys / Knighty
 // https://www.shadertoy.com/view/XlVXzh
-vec2 wrap(vec2 x, vec2 a, vec2 s){
+// vec2 wrap(vec2 x, vec2 a, vec2 s){
+//     x -= s;
+//     return (x-a*floor(x/a)) + s;
+// }
+//
+// void TransA(inout vec3 z, inout float DF, float a, float b){
+//     float iR = 1. / dot(z,z);
+//     z *= -iR;
+//     z.x = -b - z.x; z.y = a + z.y;
+//     DF *= max(1.,iR);
+// }
+//
+// float JosKleinian(vec3 z) {
+//     float adjust = 6.28; // use this for time varying behavior
+//
+//     float box_size_x=1.;
+//     float box_size_z=1.;
+//
+//     float KleinR = 1.94+0.05*abs(sin(-adjust*0.5));//1.95859103011179;
+//     float KleinI = 0.03*cos(-adjust*0.5);//0.0112785606117658;
+//     vec3 lz=z+vec3(1.), llz=z+vec3(-1.);
+//     float d=0.; float d2=0.;
+//
+//     vec3 InvCenter=vec3(1.0,1.0,0.);
+//     float rad=0.8;
+//     z=z-InvCenter;
+//     d=length(z);
+//     d2=d*d;
+//     z=(rad*rad/d2)*z+InvCenter;
+//
+//     float DE=1e10;
+//     float DF = 1.0;
+//     float a = KleinR;
+//     float b = KleinI;
+//     float f = sign(b)*1. ;
+//     for (int i = 0; i < 69 ; i++)
+//     {
+//         z.x=z.x+b/a*z.y;
+//         z.xz = wrap(z.xz, vec2(2. * box_size_x, 2. * box_size_z), vec2(- box_size_x, - box_size_z));
+//         z.x=z.x-b/a*z.y;
+//
+//         //If above the separation line, rotate by 180° about (-b/2, a/2)
+//         if  (z.y >= a * 0.5 + f *(2.*a-1.95)/4. * sign(z.x + b * 0.5)* (1. - exp(-(7.2-(1.95-a)*15.)* abs(z.x + b * 0.5))))
+//         {z = vec3(-b, a, 0.) - z;}
+//
+//         //Apply transformation a
+//         TransA(z, DF, a, b);
+//
+//         //If the iterated points enters a 2-cycle , bail out.
+//         if(dot(z-llz,z-llz) < 1e-5) {break;}
+//
+//         //Store prévious iterates
+//         llz=lz; lz=z;
+//     }
+//
+//
+//     float y =  min(z.y, a-z.y) ;
+//     DE=min(DE,min(y,0.3)/max(DF,2.));
+//     DE=DE*d2/(rad+d*DE);
+//     return DE;
+// }
+
+vec4 QtSqr ( vec4 q ){
+  return vec4 (2. * q.w * q.xyz, q.w * q.w - dot (q.xyz, q.xyz));
+}
+vec4 QtCub ( vec4 q ){
+  float b;
+  b = dot (q.xyz, q.xyz);
+  return vec4 (q.xyz * (3. * q.w * q.w - b), q.w * (q.w * q.w - 3. * b));
+}
+float nHit; // escape term
+float ObjDf ( vec3 p ){
+  vec4 q, qq, c;
+  vec2 b;
+  float s, ss, ot;
+  q = vec4 (p, 0.).yzwx;
+  c = vec4 (0.2727, 0.6818, -0.2727, -0.0909);
+  b = vec2 (0.45, 0.55);
+  s = 0.;
+  ss = 1.;
+  ot = 100.;
+  nHit = 0.;
+  for (int j = 0; j < 256; j ++) {
+    ++ nHit;
+    qq = QtSqr (q);
+    ss *= 9. * dot (qq, qq);
+    q = QtCub (q) + c;
+    ot = min (ot, length (q.wy - b) - 0.1);
+    s = dot (q, q);
+    if (s > 32.) break;
+  }
+  return min (ot, max (0.25 * log (s) * sqrt (s / ss) - 0.001, 0.));
+}
+float deFractal3(vec3 p){
+    return max( ObjDf(p), p.y );
+}
+
+
+vec2 box_size = vec2(-0.40445, 0.34) * 2.;
+
+//sphere inversion
+bool SI=false;
+vec3 InvCenter=vec3(0,1,1);
+float rad=.8;
+
+vec2 wrap ( vec2 x, vec2 a, vec2 s ) {
     x -= s;
-    return (x-a*floor(x/a)) + s;
+    return (x - a * floor(x / a)) + s;
 }
 
 void TransA(inout vec3 z, inout float DF, float a, float b){
     float iR = 1. / dot(z,z);
     z *= -iR;
     z.x = -b - z.x; z.y = a + z.y;
-    DF *= max(1.,iR);
+    DF *= iR;//max(1.,iR);
 }
 
-float JosKleinian(vec3 z) {
-    float adjust = 6.28; // use this for time varying behavior
+float JosKleinian(vec3 z)
+{
+    float t = 0.;
 
-    float box_size_x=1.;
-    float box_size_z=1.;
-
-    float KleinR = 1.94+0.05*abs(sin(-adjust*0.5));//1.95859103011179;
-    float KleinI = 0.03*cos(-adjust*0.5);//0.0112785606117658;
+    float KleinR = 1.5 + .39;
+    float KleinI = (.55 * 2. - 1.);
     vec3 lz=z+vec3(1.), llz=z+vec3(-1.);
     float d=0.; float d2=0.;
 
-    vec3 InvCenter=vec3(1.0,1.0,0.);
-    float rad=0.8;
-    z=z-InvCenter;
-    d=length(z);
-    d2=d*d;
-    z=(rad*rad/d2)*z+InvCenter;
+    if (SI) {
+        z=z-InvCenter;
+        d=length(z);
+        d2=d*d;
+        z=(rad*rad/d2)*z+InvCenter;
+    }
 
-    float DE=1e10;
-    float DF = 1.0;
+    float DE = 1e12;
+    float DF = 1.;
     float a = KleinR;
     float b = KleinI;
-    float f = sign(b)*1. ;
-    for (int i = 0; i < 69 ; i++)
+    float f = sign(b) * .45;
+    for (int i = 0; i < 80 ; i++)
     {
-        z.x=z.x+b/a*z.y;
-        z.xz = wrap(z.xz, vec2(2. * box_size_x, 2. * box_size_z), vec2(- box_size_x, - box_size_z));
-        z.x=z.x-b/a*z.y;
+        z.x += b / a * z.y;
+        z.xz = wrap(z.xz, box_size * 2., -box_size);
+        z.x -= b / a * z.y;
 
         //If above the separation line, rotate by 180° about (-b/2, a/2)
         if  (z.y >= a * 0.5 + f *(2.*a-1.95)/4. * sign(z.x + b * 0.5)* (1. - exp(-(7.2-(1.95-a)*15.)* abs(z.x + b * 0.5))))
@@ -254,12 +357,89 @@ float JosKleinian(vec3 z) {
         llz=lz; lz=z;
     }
 
+    float y =  min(z.y, a - z.y);
+    DE = min(DE, min(y, .3) / max(DF, 2.));
+    if (SI) {
+        DE = DE * d2 / (rad + d * DE);
+    }
 
-    float y =  min(z.y, a-z.y) ;
-    DE=min(DE,min(y,0.3)/max(DF,2.));
-    DE=DE*d2/(rad+d*DE);
     return DE;
 }
+
+
+
+// Spherical Inversion Variant of Above
+float deLoopy ( vec3 p ) {
+	p = p.yzx;
+  float adjust = 6.28; // use this for time varying behavior
+  float box_size_x = 1.0;
+  float box_size_z = 1.0;
+  float KleinR = 1.95859103011179;
+  float KleinI = 0.0112785606117658;
+  vec3 lz = p + vec3( 1.0 ), llz = p + vec3( -1.0 );
+  float d = 0.0; float d2 = 0.0;
+  vec3 InvCenter = vec3( 1.0, 1.0, 0.0 );
+  float rad = 0.8;
+  p = p - InvCenter;
+  d = length( p );
+  d2 = d * d;
+  p = ( rad * rad / d2 ) * p + InvCenter;
+  float DE = 1e10;
+  float DF = 1.0;
+  float a = KleinR;
+  float b = KleinI;
+  float f = sign( b ) * 1.0;
+  for ( int i = 0; i < 69 ; i++ ) {
+    p.x = p.x + b / a * p.y;
+    p.xz = wrap( p.xz, vec2( 2. * box_size_x, 2. * box_size_z ), vec2( -box_size_x, - box_size_z ) );
+    p.x = p.x - b / a * p.y;
+    if ( p.y >= a * 0.5 + f *( 2.0 * a - 1.95 ) / 4.0 * sign( p.x + b * 0.5 ) *
+     ( 1.0 - exp( -( 7.2 - ( 1.95 - a ) * 15.0 )* abs( p.x + b * 0.5 ) ) ) ) {
+      p = vec3( -b, a, 0.0 ) - p;
+    } //If above the separation line, rotate by 180° about (-b/2, a/2)
+    TransA( p, DF, a, b ); //Apply transformation a
+    if ( dot( p - llz, p - llz ) < 1e-5 ) {
+      break;
+    } //If the iterated points enters a 2-cycle , bail out.
+    llz = lz; lz = p; //Store previous iterates
+  }
+
+  float y =  min( p.y, a-p.y );
+  DE = min( DE, min( y, 0.3 ) / max( DF, 2.0 ) );
+  DE = DE * d2 / ( rad + d * DE );
+  return DE;
+}
+
+
+// Hash based domain repeat snowflakes - Rikka 2 demo
+float hash(float v){return fract(sin(v*22.9)*67.);}
+mat2 rot(float a){float s=sin(a),c=cos(a);return mat2(c,s,-s,c);}
+vec2 hexFold(vec2 p){return abs(abs(abs(p)*mat2(.866,.5,-.5,.866))*mat2(.5,-.866,.866,.5));}
+float sdHex(vec3 p){p=abs(p);return max(p.z-.02,max((p.x*.5+p.y*.866),p.x)-.015);}
+float deFlakes(vec3 p){
+  float h=hash(floor(p.x)+floor(p.y)*133.3+floor(p.z)*166.6),o=13.0,s=1.+h;
+	float t = 1.0;
+  p=fract(p)-.5;
+  p.y+=h*.4-.2;
+  p.xz*=rot(t*(h+.8));
+  p.yz*=rot(t+h*5.);
+  h=hash(h);p.x+=h*.15;
+  float l=dot(p,p);
+  if(l>.1)return l*2.;
+  for(int i=0;i<5;i++){
+    p.xy=hexFold(p.xy);
+    p.xy*=mat2(.866,-.5,.5,.866);
+    p.x*=(s-h);
+    h=hash(h);p.y-=h*.065-.015;p.y*=.8;
+    p.z*=1.2;
+    h=hash(h);p*=1.+h*.3;
+    o=min(o,sdHex(p));
+    h=hash(h);s=1.+h*2.;
+  }
+  return o;
+}
+
+
 
 
 
@@ -298,7 +478,8 @@ float de( vec3 p ) {
 
 	// fractal object
 	// float dFractal = deFractal( p );
-	float dFractal = JosKleinian( p );
+	// float dFractal = JosKleinian( p );
+	float dFractal = deLoopy( p - vec3( 0.0, 1.0, 2.0 ) );
 	sceneDist = min( dFractal, sceneDist );
 	if( sceneDist == dFractal && dFractal <= epsilon ) {
 		// hitpointColor = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 10.0 );
@@ -325,10 +506,11 @@ float de( vec3 p ) {
 	}
 
 	pMod2( p.xz, vec2( 2.0 ) );
+	// float dLightBall = deFlakes( p );
 	float dLightBall = distance( p, vec3( 0.0, 7.5, 0.0 ) ) - 0.1618;
 	sceneDist = min( dLightBall, sceneDist );
 	if( sceneDist == dLightBall && dLightBall <= epsilon ) {
-		hitpointColor = vec3( 1.0 );
+		hitpointColor = vec3( 0.8 );
 		hitpointSurfaceType = EMISSIVE;
 	}
 
@@ -484,6 +666,20 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 	return finalColor;
 }
 
+#define RANDOM
+vec2 getRandomOffset( int n ){
+	// weyl sequence from http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/ and https://www.shadertoy.com/view/4dtBWH
+#ifdef UNIFORM
+		return fract( vec2( 0.0 ) + vec2(n*12664745, n*9560333)/exp2(24.));	// integer mul to avoid round-off
+#endif
+#ifdef UNIFORM2
+		return fract( vec2( 0.0 ) + float(n)*vec2(0.754877669, 0.569840296));
+#endif
+// wang hash random offsets
+#ifdef RANDOM
+		return vec2( randomFloat(), randomFloat() ) ;
+#endif
+}
 
 void storeNormalAndDepth( vec3 normal, float depth ) {
 	// blend with history and imageStore
@@ -492,7 +688,7 @@ void storeNormalAndDepth( vec3 normal, float depth ) {
 	imageStore( accumulatorNormalsAndDepth, location, blendResult );
 }
 
-vec3 pathtraceSample( ivec2 location ) {
+vec3 pathtraceSample( ivec2 location, int n ) {
 	vec3  cResult = vec3( 0.0 );
 	vec3  nResult = vec3( 0.0 );
 	float dResult = 0.0;
@@ -501,7 +697,8 @@ vec3 pathtraceSample( ivec2 location ) {
 	for( int x = 0; x < AA; x++ ) {
 		for( int y = 0; y < AA; y++ ) {
 			// pixel offset + mapped position
-			vec2 offset = vec2( x + randomFloat(), y + randomFloat() ) / float( AA ) - 0.5;
+			// vec2 offset = vec2( x + randomFloat(), y + randomFloat() ) / float( AA ) - 0.5; // previous method
+			vec2 offset = ( getRandomOffset( n ) + vec2( x, y ) ) / float( AA );
 			vec2 halfScreenCoord = vec2( imageSize( accumulatorColor ) / 2.0 );
 			vec2 mappedPosition = ( vec2( location + offset ) - halfScreenCoord ) / halfScreenCoord;
 
@@ -539,6 +736,6 @@ void main() {
 	vec4 prevResult = imageLoad( accumulatorColor, location );
 	sampleCount = prevResult.a + 1.0;
 
-	vec3 blendResult = mix( prevResult.rgb, pathtraceSample( location ), 1.0 / sampleCount );
+	vec3 blendResult = mix( prevResult.rgb, pathtraceSample( location, int( sampleCount ) ), 1.0 / sampleCount );
 	imageStore( accumulatorColor, location, vec4( blendResult, sampleCount ) );
 }

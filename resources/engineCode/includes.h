@@ -85,15 +85,24 @@ constexpr int MSAACount = 1;
 #include "../JSON/json.hpp"
 using json = nlohmann::json;
 
-// #define WIDTH 640
-// #define HEIGHT 480
+#define WIDTH  640
+#define HEIGHT 480
 
-#define WIDTH  1920 * 2																			// width of the texture that the tiles render to
-#define HEIGHT 1080 * 2																			// height of the texture that the tiles render to
+// 4k
+// #define WIDTH  1920 * 2																			// width of the texture that the tiles render to
+// #define HEIGHT 1080 * 2																			// height of the texture that the tiles render to
+
+// 720p
+// #define WIDTH 1280
+// #define HEIGHT 720
+
+// #define WIDTH  5000
+// #define HEIGHT 1500
+
 
 #define PERFORMANCEHISTORY 250															// how many datapoints to keep for tile count / fps
 // #define TILESIZE 32																					// play around with this - higher seems to be higher perf, but more frame latency - set to 256 or more on desktop and let er rip
-#define TILESIZE 256
+#define TILESIZE 512
 
 struct hostParameters {
 	int screenshotDim = WIDTH; 																// width of the screenshot - the code maintains the aspect ratio of HEIGHT/WIDTH
@@ -105,9 +114,9 @@ struct coreParameters {
 	glm::ivec2 tileOffset = glm::ivec2( 0, 0 ); 							// x, y of current tile
 	glm::ivec2 noiseOffset = glm::ivec2( 0, 0 );							// updated once a frame, offset blue noise texture so there isn't Voraldo's stroke pattern in v1.2
 	int maxSteps = 100;																				// max raymarch steps
-	int maxBounces = 10;																			// max pathtrace bounces
+	int maxBounces = 32;																			// max pathtrace bounces
 	float maxDistance = 100.0;																// max raymarch distance
-	float epsilon = 0.001;																		// raymarch surface epsilon
+	float epsilon = 0.0001;																		// raymarch surface epsilon
 	float exposure = 0.98;																		// scale factor for the final color result
 	float focusDistance = 10.0;																// used for the thin lens approximation ( include an intensity scalar to this as well ( resize jitter disk ) )
 	float thinLensIntensity = 1.0;														// scales the disk offset for the thin lens approximation ( scales the intensity of the effect )

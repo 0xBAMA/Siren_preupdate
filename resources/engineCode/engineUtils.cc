@@ -443,7 +443,7 @@ void engine::basicScreenShot() {
 	for ( int x = 0; x < WIDTH; x++ ) {
 		for ( int y = 0; y < HEIGHT; y++ ) {
 			for ( int c = 0; c < 4; c++ ) {
-				outputBytes[ ( ( x + y * WIDTH ) * 4 ) + c ] = imageAsBytes[ ( ( WIDTH - x - 1 ) + ( HEIGHT - y - 1 ) * WIDTH ) * 4 + c ];
+				outputBytes[ ( ( x + y * WIDTH ) * 4 ) + c ] = imageAsBytes[ ( x + ( HEIGHT - y - 1 ) * WIDTH ) * 4 + c ];
 			}
 		}
 	}
