@@ -1,21 +1,20 @@
 #include "engine.h"
 
 bool engine::mainLoop() {
-	render();											// render with the current mode
-	postprocess( );								// colorAccumulatorTexture -> displayTexture
-	mainDisplayBlit();						// fullscreen triangle copying the image
-	imguiPass();									// do all the GUI stuff
+	render();						// render with the current mode
+	postprocess();					// colorAccumulatorTexture -> displayTexture
+	mainDisplayBlit();				// fullscreen triangle copying the image
+	imguiPass();					// do all the GUI stuff
 	SDL_GL_SwapWindow( window );	// swap the double buffers to present
-	handleEvents();								// handle input events
-	return !pQuit;								// break loop in main.cc when pQuit becomes true
+	handleEvents();					// handle input events
+	return !pQuit;					// break loop in main.cc when pQuit becomes true
 }
 
 void engine::render() {
 	// different rendering modes - preview until pathtrace is triggered
 	glUseProgram( pathtraceShader );
 
-
-	if ( currentMode == renderMode::pathtrace ) {
+	if ( host.currentMode == renderMode::pathtrace ) {
 		// 2d blue noise read offset
 		updateNoiseOffsets();
 
@@ -76,7 +75,7 @@ void engine::render() {
 		tileHistory.push_back( tilesCompleted );
 		tileHistory.pop_front();
 
-	} else if ( currentMode == renderMode::preview && host.rendererRequiresUpdate ) {
+	} else if ( host.currentMode == renderMode::preview && host.rendererRequiresUpdate == true ) {
 		host.rendererRequiresUpdate = false;
 
 		// quick raymarch, only runs when movement has happened since last render event
@@ -95,7 +94,7 @@ void engine::updateNoiseOffsets () {
 }
 
 void engine::pathtraceUniformUpdate() {
-
+	// core
 	glUniform2i( glGetUniformLocation( pathtraceShader, "noiseOffset" ), core.noiseOffset.x, core.noiseOffset.y );
 	glUniform1i( glGetUniformLocation( pathtraceShader, "maxSteps" ), core.maxSteps );
 	glUniform1i( glGetUniformLocation( pathtraceShader, "maxBounces" ), core.maxBounces );
@@ -111,6 +110,7 @@ void engine::pathtraceUniformUpdate() {
 	glUniform3f( glGetUniformLocation( pathtraceShader, "basisZ"), core.basisZ.x, core.basisZ.y, core.basisZ.z );
 	glUniform1f( glGetUniformLocation( pathtraceShader, "understep" ), core.understep );
 
+	// lens
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensScaleFactor" ), lens.lensScaleFactor );
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensRadius1" ), lens.lensRadius1 );
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensRadius2" ), lens.lensRadius2 );
@@ -118,6 +118,7 @@ void engine::pathtraceUniformUpdate() {
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensRotate" ), lens.lensRotate );
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensIOR" ), lens.lensIOR );
 
+	// scene
 	glUniform3f( glGetUniformLocation( pathtraceShader, "redWallColor" ), scene.redWallColor.x, scene.redWallColor.y, scene.redWallColor.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "greenWallColor" ), scene.greenWallColor.x, scene.greenWallColor.y, scene.greenWallColor.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "metallicDiffuse" ), scene.metallicDiffuse.x, scene.metallicDiffuse.y, scene.metallicDiffuse.z );
@@ -129,7 +130,7 @@ void engine::postprocess() {
 
 	// send associated uniforms
 
-	glDispatchCompute( std::ceil( WIDTH / 32. ), std::ceil( HEIGHT / 32. ), 1 );
+	glDispatchCompute( std::ceil( WIDTH / 32 ), std::ceil( HEIGHT / 32 ), 1 );
 	glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT ); // sync
 }
 
@@ -160,7 +161,7 @@ void engine::resetAccumulators() {
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &imageData[ 0 ] );
 	// wait for sync
 	glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
-	fullscreenPasses = 0; // reset sample count
+	host.fullscreenPasses = 0; // reset sample count
 	cout << "Accumulator Buffer has been reinitialized" << endl;
 }
 
@@ -297,7 +298,7 @@ void engine::imguiPass() {
 			// should stay flat (tm) at 60fps, given the structure of the pathtracing function ( abort on t >= 60fps equivalent )
 		ImGui::SetCursorPosX( 15 );
 		ImGui::PlotLines( " ", fpsValues, IM_ARRAYSIZE( fpsValues ), 0, fpsOverlay, -10.0f, 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
-		ImGui::Text( "  Current Sample Count: %d", fullscreenPasses );
+		ImGui::Text( "  Current Sample Count: %d", host.fullscreenPasses );
 	}
 
 	// finished with the settings window
@@ -331,7 +332,7 @@ void engine::handleEvents() {
 
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r ) {
 			resetAccumulators();
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 
 		// quaternion based rotation via retained state in the basis vectors - much easier to use than the arbitrary euler angles
@@ -339,37 +340,37 @@ void engine::handleEvents() {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisX ); // basisX is the axis, therefore remains untransformed
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisX );
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisY ); // same as above, but basisY is the axis
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisY );
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisZ ); // and again for basisZ
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisZ );
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 
 		// f to reset basis, shift + f to reset basis and home to origin
@@ -381,32 +382,32 @@ void engine::handleEvents() {
 			core.basisX = glm::vec3( 1.0f, 0.0f, 0.0f );
 			core.basisY = glm::vec3( 0.0f, 1.0f, 0.0f );
 			core.basisZ = glm::vec3( 0.0f, 0.0f, 1.0f );
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP ) {
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisZ;
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_DOWN ) {
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisZ;
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RIGHT ) {
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisX;
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_LEFT ) {
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisX;
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEUP ) {
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisY;
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEDOWN ) {
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisY;
-			rendererRequiresUpdate = true;
+			host.rendererRequiresUpdate = true;
 		}
 	}
 }
@@ -424,9 +425,9 @@ glm::ivec2 engine::getTile() {
 				offsets.push_back( glm::ivec2( x, y ) );
 			}
 		}
-	} else { // check if the offset needs to be reset
+	} else { // check if the offset needs to be reset, this means a full pass has been completed
 		if ( ++listOffset == int( offsets.size() ) ) {
-			listOffset = 0; fullscreenPasses++;
+			listOffset = 0; host.fullscreenPasses++;
 		}
 	}
 	// shuffle when listOffset is zero ( first iteration, and any subsequent resets )
@@ -485,11 +486,11 @@ void engine::basicScreenShot() {
 	auto in_time_t = std::chrono::system_clock::to_time_t( now );
 
 	std::stringstream ss;
-	ss << std::put_time(std::localtime(&in_time_t), "Screenshot-%Y-%m-%d %X") << ".png";
+	ss << std::put_time( std::localtime( &in_time_t ), "Screenshot-%Y-%m-%d %X" ) << ".png";
 	std::string filename = ss.str();
 
 	unsigned error;
-	if ( ( error = lodepng::encode( filename.c_str(), outputBytes, WIDTH, HEIGHT ))) {
+	if ( ( error = lodepng::encode( filename.c_str(), outputBytes, WIDTH, HEIGHT ) ) ) {
 		std::cout << "encode error during save(\" " + filename + " \") " << error << ": " << lodepng_error_text( error ) << std::endl;
 	}
 }

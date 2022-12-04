@@ -83,8 +83,6 @@ private:
 	// performance monitoring histories
 	std::deque<float> fpsHistory;
 	std::deque<float> tileHistory;
-
-	int fullscreenPasses = 0;
 };
 
 #endif

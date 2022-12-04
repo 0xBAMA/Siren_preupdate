@@ -102,6 +102,7 @@ struct hostParameters {
 	bool rendererRequiresUpdate = true;				// has the viewer moved since the screen has updated?
 	renderMode currentMode = renderMode::preview;	// how should we render the scene?
 	int performanceHistory = 250;					// how many datapoints to keep for tile count / fps
+	int fullscreenPasses = 0;						// how many times have we exhausted the tile vector
 
 	int tilePerFrameCap = 128;						// max number of tiles allowed to be executed in a frame update
 	int tileSizeUpdated = true;						// (re)builds the tile list
@@ -117,27 +118,27 @@ struct coreParameters {
 	glm::ivec2 noiseOffset = glm::ivec2( 0, 0 );	// updated once a frame, offset blue noise texture so there isn't Voraldo's stroke pattern in v1.2
 	int maxSteps = 100;								// max raymarch steps
 	int maxBounces = 32;							// max pathtrace bounces
-	float maxDistance = 100.0;						// max raymarch distance
-	float epsilon = 0.0001;							// raymarch surface epsilon
-	float exposure = 0.98;							// scale factor for the final color result
-	float focusDistance = 10.0;						// used for the thin lens approximation ( include an intensity scalar to this as well ( resize jitter disk ) )
-	float thinLensIntensity = 1.0;					// scales the disk offset for the thin lens approximation ( scales the intensity of the effect )
+	float maxDistance = 100.0f;						// max raymarch distance
+	float epsilon = 0.0001f;						// raymarch surface epsilon
+	float exposure = 0.98f;							// scale factor for the final color result
+	float focusDistance = 10.0f;					// used for the thin lens approximation ( include an intensity scalar to this as well ( resize jitter disk ) )
+	float thinLensIntensity = 1.0f;					// scales the disk offset for the thin lens approximation ( scales the intensity of the effect )
 	int normalMethod = 1;							// method for calculating the surface normal for the SDF geometry
-	float FoV = 0.618;								// FoV for the rendering - higher is wider
-	glm::vec3 viewerPosition = glm::vec3( 0.0 );	// location of the viewer
-	glm::vec3 basisX = glm::vec3( 1.0, 0.0, 0.0 );	// basis vectors are used to control viewer movement and rotation, as well as create the camera
-	glm::vec3 basisY = glm::vec3( 0.0, 1.0, 0.0 );
-	glm::vec3 basisZ = glm::vec3( 0.0, 0.0, 1.0 );
+	float FoV = 0.618f;								// FoV for the rendering - higher is wider
+	glm::vec3 viewerPosition = glm::vec3( 0.0f );	// location of the viewer
+	glm::vec3 basisX = glm::vec3( 1.0f, 0.0f, 0.0f );	// basis vectors are used to control viewer movement and rotation, as well as create the camera
+	glm::vec3 basisY = glm::vec3( 0.0f, 1.0f, 0.0f );
+	glm::vec3 basisZ = glm::vec3( 0.0f, 0.0f, 1.0f );
 	float understep = 0.618;						// scale factor on distance estimate when applied to the step during marching - lower is slower, as more steps are taken before reaching the surface
 };
 
 struct lensParameters {
-	float lensScaleFactor = 1.0;					// size of the lens object - vessica pices, in 3d ( intersection of two offset spheres )
-	float lensRadius1 = 10.0;						// radius of the first side of the lens
-	float lensRadius2 = 3.0;						// radius of the second side of the lens
-	float lensThickness = 0.3;						// amount by which the spheres are offset from one another, before intersection
-	float lensRotate = 0.0;							// rotates the lens - should this be done this way, or two points? maybe a quaternion
-	float lensIOR = 1.2;							// index of refraction of the lens material
+	float lensScaleFactor = 1.0f;					// size of the lens object - vessica pices, in 3d ( intersection of two offset spheres )
+	float lensRadius1 = 10.0f;						// radius of the first side of the lens
+	float lensRadius2 = 3.0f;						// radius of the second side of the lens
+	float lensThickness = 0.3f;						// amount by which the spheres are offset from one another, before intersection
+	float lensRotate = 0.0f;						// rotates the lens - should this be done this way, or two points? maybe a quaternion
+	float lensIOR = 1.2f;							// index of refraction of the lens material
 };
 
 struct sceneParameters {
