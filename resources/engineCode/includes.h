@@ -85,29 +85,30 @@ constexpr int MSAACount = 1;
 #include "../JSON/json.hpp"
 using json = nlohmann::json;
 
-#define WIDTH  640
-#define HEIGHT 480
+// 640x480
+// #define WIDTH  640
+// #define HEIGHT 480
+
+// 720p
+#define WIDTH 1280
+#define HEIGHT 720
 
 // 4k
 // #define WIDTH  1920 * 2			// width of the texture that the tiles render to
 // #define HEIGHT 1080 * 2			// height of the texture that the tiles render to
 
-// 720p
-// #define WIDTH 1280
-// #define HEIGHT 720
-
-// #define WIDTH  5000
-// #define HEIGHT 1500
-
-
-#define PERFORMANCEHISTORY 250		// how many datapoints to keep for tile count / fps
-// #define TILESIZE 32				// play around with this - higher seems to be higher perf, but more frame latency - set to 256 or more on desktop and let er rip
-#define TILESIZE 512
-
+enum class renderMode { none, preview, pathtrace };
 struct hostParameters {
 	int screenshotDim = WIDTH; 						// width of the screenshot - the code maintains the aspect ratio of HEIGHT/WIDTH
-	int tilePerFrameCap = 128;						// max number of tiles allowed to be executed in a frame update
 	int numSamplesScreenshot = 128; 				// how many samples to take when rendering the screenshot
+	bool movementSinceUpdate = true;				// has the viewer moved since the screen has updated?
+
+	renderMode currentMode = renderMode::preview;	// how should we render the scene?
+	int performanceHistory = 250;					// how many datapoints to keep for tile count / fps
+
+	int tilePerFrameCap = 128;						// max number of tiles allowed to be executed in a frame update
+	int tileSizeUpdated = true;						// (re)builds the tile list
+	int tileSize = 512;								// size of one rendering tile ( square )
 };
 
 struct coreParameters {

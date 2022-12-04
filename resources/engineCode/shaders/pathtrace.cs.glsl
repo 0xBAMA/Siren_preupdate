@@ -1,5 +1,5 @@
 #version 430 core
-layout( local_size_x = 16, local_size_y = 16, local_size_z = 1 ) in;
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
 layout( binding = 1, rgba32f ) uniform image2D accumulatorColor;
 layout( binding = 2, rgba32f ) uniform image2D accumulatorNormalsAndDepth;
@@ -283,7 +283,7 @@ float de ( vec3 p ) {
 	}
 
 	// cieling and floor
-	float dFloorCieling = min( dePlane( p, vec3( 0.0f, -1.0f, 0.0f ), 10.0f ),  dePlane( p, vec3( 0.0f, 1.0f, 0.0f ), 7.5f ) );
+	float dFloorCieling = min( dePlane( p, vec3( 0.0f, -1.0f, 0.0f ), 10.0f ), dePlane( p, vec3( 0.0f, 1.0f, 0.0f ), 7.5f ) );
 	sceneDist = min( dFloorCieling, sceneDist );
 	if ( sceneDist == dFloorCieling && dFloorCieling <= epsilon ) {
 		hitpointColor = vec3( 0.9f );
@@ -305,12 +305,12 @@ float de ( vec3 p ) {
 }
 
 // fake AO, computed from SDF
-float calcAO ( in vec3 pos, in vec3 nor ) {
+float calcAO ( in vec3 position, in vec3 normal ) {
 	float occ = 0.0f;
 	float sca = 1.0f;
 	for( int i = 0; i < 5; i++ ) {
 		float h = 0.001f + 0.15f * float( i ) / 4.0f;
-		float d = de( pos + h * nor );
+		float d = de( position + h * normal );
 		occ += ( h - d ) * sca;
 		sca *= 0.95f;
 	}
@@ -422,7 +422,7 @@ vec3 colorSample ( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 				// ray refracts, instead of bouncing
 				// for now, perfect reflector with small attenuation
 				rayDirection = reflectedVector;
-				throughput *= 0.97f;
+				throughput *= 0.9f;
 
 				// flip the sign to invert the lens material distance estimate, because the ray is either entering or leaving a refractive medium
 				// refractState = -1.0 * refractState;

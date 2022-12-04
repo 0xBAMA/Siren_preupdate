@@ -3,8 +3,6 @@
 
 #include "includes.h"
 
-enum class renderMode { none, preview, pathtrace };
-
 class engine {
 public:
 	engine()	{ init(); }
@@ -48,15 +46,12 @@ private:
 	void quitConf( bool *open );
 	void HelpMarker( const char* message );
 
-
 	// screenshot functions
 	void basicScreenShot();		// pull render target from texture memory
 	void offlineScreenShot();	// render out with prescribed sample count + resolution
 
 	// rendering functions
-	void render(); 				// wrapper
-	void raymarch();			// preview render
-	void pathtrace();			// accumulate samples
+	void render(); 			// swichable functionality
 	void postprocess();		// tonemap, dither
 	glm::ivec2 getTile();	// tile renderer offset
 
@@ -68,15 +63,13 @@ private:
 	// program flags
 	bool quitConfirm = false;
 	bool pQuit = false;
-	bool filter	= true;
-	renderMode mode = renderMode::pathtrace;
+	bool filter = true;
 
 	// OpenGL data handles
 		// render
 	GLuint colorAccumulatorTexture;
 	GLuint normalAccumulatorTexture;
 	GLuint blueNoiseTexture;
-	GLuint raymarchShader;
 	GLuint pathtraceShader;
 	GLuint postprocessShader;
 		// present

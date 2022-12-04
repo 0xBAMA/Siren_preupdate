@@ -5,14 +5,14 @@ layout( binding = 0, rgba8ui ) uniform uimage2D display;
 layout( binding = 1, rgba32f ) uniform image2D accumulatorColor;
 layout( binding = 2, rgba32f ) uniform image2D accumulatorNormal;
 
-uniform int ditherMode; 			// colorspace to do the dithering in
-uniform int ditherMethod; 		// bitcrush bitcount or exponential scalar
-uniform int ditherPattern; 		// pattern used to dither the output - probably make this an image/texture
-uniform int tonemapMode; 			// tonemap curve to use
-uniform int depthMode; 				// depth fog method
-uniform float depthScale; 		// scalar for depth term, when computing depth effects ( fog )
-uniform float gamma; 					// gamma correction term for the color result
-uniform int displayType; 			// mode selector - show normals, show depth, show color, show postprocessed version
+uniform int ditherMode; 	// colorspace to do the dithering in
+uniform int ditherMethod; 	// bitcrush bitcount or exponential scalar
+uniform int ditherPattern; 	// pattern used to dither the output - probably make this an image/texture
+uniform int tonemapMode; 	// tonemap curve to use
+uniform int depthMode; 		// depth fog method
+uniform float depthScale; 	// scalar for depth term, when computing depth effects ( fog )
+uniform float gamma; 		// gamma correction term for the color result
+uniform int displayType; 	// mode selector - show normals, show depth, show color, show postprocessed version
 
 void main() {
 	// this isn't tiled - it may need to be, for when rendering larger resolution screenshots

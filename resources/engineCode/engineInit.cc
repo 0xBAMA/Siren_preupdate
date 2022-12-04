@@ -87,12 +87,7 @@ void engine::createWindowAndContext() {
 
 	cout << T_BLUE << "    Setting up Textures" << RESET << " .............................. ";
 
-	// fill with random values
-	std::default_random_engine gen;
-	std::uniform_int_distribution< uint8_t > dist( 150, 255 );
-
 	for ( auto it = imageData.begin(); it != imageData.end(); it++ )
-	// *it = dist( gen );
 		*it = 255;
 
 	// image setup on the GPU - output texture is the only one where filtering is relevant
@@ -121,8 +116,9 @@ void engine::createWindowAndContext() {
 	unsigned lWidth, lHeight, lError;
 	std::vector< unsigned char > lImage;
 	lError = lodepng::decode( lImage, lWidth, lHeight, "resources/noise/blueNoise.png" );
-	if( lError )
+	if ( lError ) {
 		cout << "Blue noise - decoder error " << lError << ": " << lodepng_error_text( lError ) << endl;
+	}
 
 	glGenTextures( 1, &blueNoiseTexture );
 	glActiveTexture( GL_TEXTURE0 + 3 );
@@ -162,8 +158,8 @@ void engine::imguiSetup() {
 	// io.Fonts->AddFontFromFileTTF("resources/fonts/star_trek/titles/TNG_Title.ttf", 16);
 
 	// prepare performance monitoring history deques
-	fpsHistory.resize( PERFORMANCEHISTORY );
-	tileHistory.resize( PERFORMANCEHISTORY );
+	fpsHistory.resize( host.performanceHistory );
+	tileHistory.resize( host.performanceHistory );
 
 	// imgui style settings
 	ImGui::StyleColorsDark();
@@ -219,12 +215,12 @@ void engine::imguiSetup() {
 
 	ImGuiStyle &style = ImGui::GetStyle();
 
-	style.TabRounding = 2;
-	style.FrameRounding = 2;
+	style.TabRounding = 4;
+	style.FrameRounding = 4;
 	style.WindowPadding.x = 0;
 	style.WindowPadding.y = 0;
-	style.FramePadding.x = 1;
-	style.FramePadding.y = 0;
+	style.FramePadding.x = 2;
+	style.FramePadding.y = 2;
 	style.IndentSpacing = 8;
 	style.WindowRounding = 3;
 	style.ScrollbarSize = 10;
@@ -235,7 +231,6 @@ void engine::computeShaderCompile() {
 	// compile any compute shaders here, store handles in engine class member function variables
 	cout << T_BLUE << "    Compiling Compute Shaders" << RESET << " ........................ ";
 
-	raymarchShader    = CShader( "resources/engineCode/shaders/raymarch.cs.glsl" ).Program;
 	pathtraceShader   = CShader( "resources/engineCode/shaders/pathtrace.cs.glsl" ).Program;
 	postprocessShader = CShader( "resources/engineCode/shaders/postprocess.cs.glsl" ).Program;
 

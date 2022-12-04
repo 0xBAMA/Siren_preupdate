@@ -12,21 +12,67 @@ bool engine::mainLoop() {
 
 void engine::render() {
 	// different rendering modes - preview until pathtrace is triggered
-	switch ( mode ) {
-		case renderMode::preview:   raymarch();  break;
-		case renderMode::pathtrace: pathtrace(); break;
-		default: break;
+	glUseProgram( pathtraceShader );
+
+	// 2d blue noise read offset
+	updateNoiseOffsets();
+
+	// send the uniforms
+	pathtraceUniformUpdate();
+
+	GLuint64 startTime, checkTime;
+	GLuint queryID[ 2 ];
+	glGenQueries( 2, queryID );
+	glQueryCounter( queryID[ 0 ], GL_TIMESTAMP );
+
+	// get startTime
+	GLint startTimeAvailable = 0;
+	while( !startTimeAvailable )
+	glGetQueryObjectiv( queryID[ 0 ], GL_QUERY_RESULT_AVAILABLE, &startTimeAvailable );
+	glGetQueryObjectui64v( queryID[ 0 ], GL_QUERY_RESULT, &startTime );
+
+	// used for the wang hash seeding, as well as the noise offset
+	static std::default_random_engine gen;
+	static std::uniform_int_distribution< int > dist( 0, std::numeric_limits< int >::max() / 4 );
+
+	int tilesCompleted = 0;
+	float looptime = 0.0f;
+
+	while( 1 ) {
+		glm::ivec2 tile = getTile(); // get a tile offset + send it
+		glUniform2i( glGetUniformLocation( pathtraceShader, "tileOffset" ), tile.x, tile.y );
+
+		// seeding the wang rng in the shader - shader uses both the screen location and this value
+		int value = dist( gen );
+		// cout << value << endl;
+		glUniform1i( glGetUniformLocation( pathtraceShader, "wangSeed" ), value );
+
+		// render the specified tile - dispatch
+		glDispatchCompute( host.tileSize / 8, host.tileSize / 8, 1 );
+		// glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
+		glMemoryBarrier(  GL_ALL_BARRIER_BITS );
+		tilesCompleted++;
+
+		// check time, wait for query to be ready
+		glQueryCounter( queryID[ 1 ], GL_TIMESTAMP );
+		GLint checkTimeAvailable = 0;
+		while( !checkTimeAvailable ) {
+			glGetQueryObjectiv( queryID[ 1 ], GL_QUERY_RESULT_AVAILABLE, &checkTimeAvailable );
+		}
+		glGetQueryObjectui64v( queryID[ 1 ], GL_QUERY_RESULT, &checkTime );
+
+		// break if duration exceeds 16 ms ( 60fps + a small margin ) - query units are nanoseconds
+		looptime = ( checkTime - startTime ) / 1e6f; // get milliseconds
+		if( looptime > ( 16.0f ) || tilesCompleted >= host.tilePerFrameCap ) {
+			// cout << tilesCompleted << " tiles in " << looptime << " ms, avg " << looptime / tilesCompleted << " ms/tile" << endl;
+			break;
+		}
 	}
-}
+	fpsHistory.push_back( 1000.0f / looptime );
+	fpsHistory.pop_front();
 
-void engine::raymarch() {
-	glUseProgram( raymarchShader );
-	// do a fullscreen pass with simple shading, flag to prevent unncessesary further update
-
-	// send associated uniforms
-
-	// not sure if I actually want to include this as a feature, but that may be laziness talking
-		// will revisit once the pathtracing logic is implemented
+	tileHistory.push_back( tilesCompleted );
+	tileHistory.pop_front();
 }
 
 void engine::updateNoiseOffsets () {
@@ -65,70 +111,6 @@ void engine::pathtraceUniformUpdate() {
 	glUniform3f( glGetUniformLocation( pathtraceShader, "redWallColor" ), scene.redWallColor.x, scene.redWallColor.y, scene.redWallColor.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "greenWallColor" ), scene.greenWallColor.x, scene.greenWallColor.y, scene.greenWallColor.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "metallicDiffuse" ), scene.metallicDiffuse.x, scene.metallicDiffuse.y, scene.metallicDiffuse.z );
-}
-
-void engine::pathtrace() {
-	glUseProgram( pathtraceShader );
-
-	//
-	updateNoiseOffsets();
-
-	// send the uniforms
-	pathtraceUniformUpdate();
-
-	GLuint64 startTime, checkTime;
-	GLuint queryID[ 2 ];
-	glGenQueries( 2, queryID );
-	glQueryCounter( queryID[ 0 ], GL_TIMESTAMP );
-
-	// get startTime
-	GLint startTimeAvailable = 0;
-	while( !startTimeAvailable )
-	glGetQueryObjectiv( queryID[ 0 ], GL_QUERY_RESULT_AVAILABLE, &startTimeAvailable );
-	glGetQueryObjectui64v( queryID[ 0 ], GL_QUERY_RESULT, &startTime );
-
-	// used for the wang hash seeding, as well as the noise offset
-	static std::default_random_engine gen;
-	static std::uniform_int_distribution< int > dist( 0, std::numeric_limits< int >::max() / 4 );
-
-	int tilesCompleted = 0;
-	float looptime = 0.;
-	while( 1 ) {
-		// get a tile offset + send it
-		glm::ivec2 tile = getTile();
-		glUniform2i( glGetUniformLocation( pathtraceShader, "tileOffset" ), tile.x, tile.y );
-
-		// seeding the wang rng in the shader - shader uses both the screen location and this value
-		int value = dist( gen );
-		// cout << value << endl;
-		glUniform1i( glGetUniformLocation( pathtraceShader, "wangSeed" ), value );
-
-		// render the specified tile - dispatch
-		glDispatchCompute( TILESIZE / 16, TILESIZE / 16, 1 );
-		// glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
-		glMemoryBarrier(  GL_ALL_BARRIER_BITS );
-		tilesCompleted++;
-
-		// check time, wait for query to be ready
-		glQueryCounter( queryID[ 1 ], GL_TIMESTAMP );
-		// glMemoryBarrier( GL_QUERY_BUFFER_BARRIER_BIT );
-		GLint checkTimeAvailable = 0;
-		while( !checkTimeAvailable )
-			glGetQueryObjectiv( queryID[ 1 ], GL_QUERY_RESULT_AVAILABLE, &checkTimeAvailable );
-		glGetQueryObjectui64v( queryID[ 1 ], GL_QUERY_RESULT, &checkTime );
-
-		// break if duration exceeds 16 ms ( 60fps + a small margin ) - query units are nanoseconds
-		looptime = ( checkTime - startTime ) / 1e6; // get milliseconds
-		if( looptime > ( 16.0f ) || tilesCompleted >= host.tilePerFrameCap ) {
-			// cout << tilesCompleted << " tiles in " << looptime << " ms, avg " << looptime / tilesCompleted << " ms/tile" << endl;
-			break;
-		}
-	}
-	fpsHistory.push_back( 1000.0f / looptime );
-	fpsHistory.pop_front();
-
-	tileHistory.push_back( tilesCompleted );
-	tileHistory.pop_front();
 }
 
 void engine::postprocess() {
@@ -268,16 +250,16 @@ void engine::imguiPass() {
 	}
 
 	// performance monitoring
-	float tileValues[ PERFORMANCEHISTORY ] = {};
-	float fpsValues[ PERFORMANCEHISTORY ] = {};
+	float tileValues[ host.performanceHistory ] = {};
+	float fpsValues[ host.performanceHistory ] = {};
 	float tileAverage = 0;
 	float fpsAverage = 0;
-	for ( int n = 0; n < PERFORMANCEHISTORY; n++ ) {
+	for ( int n = 0; n < host.performanceHistory; n++ ) {
 		tileAverage += tileValues[ n ] = tileHistory[ n ];
 		fpsAverage += fpsValues[ n ] = fpsHistory[ n ];
 	}
-	tileAverage /= float( PERFORMANCEHISTORY );
-	fpsAverage /= float( PERFORMANCEHISTORY );
+	tileAverage /= float( host.performanceHistory );
+	fpsAverage /= float( host.performanceHistory );
 	char tileOverlay[ 100 ];
 	char fpsOverlay[ 45 ];
 
@@ -293,11 +275,11 @@ void engine::imguiPass() {
 	ImGui::Text("  Tile History");
 	ImGui::SetCursorPosX( 15 );
 
-	// graph of tiles per frame, for the past $PERFORMANCEHISTORY frames
+	// graph of tiles per frame, for the past $host.performanceHistory frames
 	ImGui::PlotLines( " ", tileValues, IM_ARRAYSIZE( tileValues ), 0, tileOverlay, -10.0f, float( host.tilePerFrameCap ) + 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
 	ImGui::Text("  FPS History");
 
-	// graph of time per frame, for the last $PERFORMANCEHISTORY frames
+	// graph of time per frame, for the last $host.performanceHistory frames
 		// should stay flat (tm) at 60fps, given the structure of the pathtracing function ( abort on t >= 60fps equivalent )
 	ImGui::SetCursorPosX( 15 );
 	ImGui::PlotLines( " ", fpsValues, IM_ARRAYSIZE( fpsValues ), 0, fpsOverlay, -10.0f, 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
@@ -403,14 +385,13 @@ void engine::handleEvents() {
 glm::ivec2 engine::getTile() {
 	static std::vector< glm::ivec2 > offsets;
 	static int listOffset = 0;
-	static bool firstTime = true;
 	std::random_device rd;
 	std::mt19937 rngen( rd() );
 
-	if ( firstTime ) { // construct the tile list
-		firstTime = false;
-		for( int x = 0; x <= WIDTH; x += TILESIZE ) {
-			for( int y = 0; y <= HEIGHT; y += TILESIZE ) {
+	if ( host.tileSizeUpdated ) { // construct the tile list ( runs at frame 0 and again any time the value changes )
+		host.tileSizeUpdated = false;
+		for( int x = 0; x <= WIDTH; x += host.tileSize ) {
+			for( int y = 0; y <= HEIGHT; y += host.tileSize ) {
 				offsets.push_back( glm::ivec2( x, y ) );
 			}
 		}
