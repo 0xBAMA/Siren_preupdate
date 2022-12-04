@@ -411,35 +411,35 @@ float deLoopy ( vec3 p ) {
 }
 
 
-// Hash based domain repeat snowflakes - Rikka 2 demo
-float hash(float v){return fract(sin(v*22.9)*67.);}
-mat2 rot(float a){float s=sin(a),c=cos(a);return mat2(c,s,-s,c);}
-vec2 hexFold(vec2 p){return abs(abs(abs(p)*mat2(.866,.5,-.5,.866))*mat2(.5,-.866,.866,.5));}
-float sdHex(vec3 p){p=abs(p);return max(p.z-.02,max((p.x*.5+p.y*.866),p.x)-.015);}
-float deFlakes(vec3 p){
-  float h=hash(floor(p.x)+floor(p.y)*133.3+floor(p.z)*166.6),o=13.0,s=1.+h;
-	float t = 1.0;
-  p=fract(p)-.5;
-  p.y+=h*.4-.2;
-  p.xz*=rot(t*(h+.8));
-  p.yz*=rot(t+h*5.);
-  h=hash(h);p.x+=h*.15;
-  float l=dot(p,p);
-  if(l>.1)return l*2.;
-  for(int i=0;i<5;i++){
-    p.xy=hexFold(p.xy);
-    p.xy*=mat2(.866,-.5,.5,.866);
-    p.x*=(s-h);
-    h=hash(h);p.y-=h*.065-.015;p.y*=.8;
-    p.z*=1.2;
-    h=hash(h);p*=1.+h*.3;
-    o=min(o,sdHex(p));
-    h=hash(h);s=1.+h*2.;
-  }
-  return o;
+
+mat3 rotZ ( float t ) {
+  float s = sin( t );
+  float c = cos( t );
+  return mat3( c, s, 0., -s, c, 0., 0., 0., 1. );
 }
-
-
+mat3 rotX ( float t ) {
+  float s = sin( t );
+  float c = cos( t );
+  return mat3( 1., 0., 0., 0., c, s, 0., -s, c );
+}
+mat3 rotY ( float t ) {
+  float s = sin( t );
+  float c = cos( t );
+  return mat3 (c, 0., -s, 0., 1., 0, s, 0, c);
+}
+float deBowl ( vec3 p ){
+  vec2 rm = radians( 360.0 ) * vec2( 0.468359, 0.95317 ); // vary x,y 0.0 - 1.0
+  mat3 scene_mtx = rotX( rm.x ) * rotY( rm.x ) * rotZ( rm.x ) * rotX( rm.y );
+  float scaleAccum = 1.;
+  for( int i = 0; i < 24; ++i ) {
+    p.yz = sqrt( p.yz * p.yz + 0.16406 );
+    p *= 1.21;
+    scaleAccum *= 1.21;
+    p -= vec3( 2.43307, 5.28488, 0.9685 );
+    p = scene_mtx * p;
+  }
+  return length( p ) / scaleAccum - 0.15;
+}
 
 
 
@@ -479,7 +479,9 @@ float de( vec3 p ) {
 	// fractal object
 	// float dFractal = deFractal( p );
 	// float dFractal = JosKleinian( p );
-	float dFractal = deLoopy( p - vec3( 0.0, 1.0, 2.0 ) );
+	// float dFractal = deLoopy( p - vec3( 0.0, 1.0, 2.0 ) );
+	// float dFractal = 0.05 * deBowl( ( p / 0.05 ) - vec3( 0.0, 1.0, 2.0 ) );
+	float dFractal = 0.05 * deBowl( ( p / 0.05 ) );
 	sceneDist = min( dFractal, sceneDist );
 	if( sceneDist == dFractal && dFractal <= epsilon ) {
 		// hitpointColor = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 10.0 );
@@ -506,7 +508,6 @@ float de( vec3 p ) {
 	}
 
 	pMod2( p.xz, vec2( 2.0 ) );
-	// float dLightBall = deFlakes( p );
 	float dLightBall = distance( p, vec3( 0.0, 7.5, 0.0 ) ) - 0.1618;
 	sceneDist = min( dLightBall, sceneDist );
 	if( sceneDist == dLightBall && dLightBall <= epsilon ) {

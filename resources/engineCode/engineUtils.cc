@@ -295,17 +295,14 @@ void engine::handleEvents() {
 		// imgui event handling
 		ImGui_ImplSDL2_ProcessEvent( &event );
 
-		if ( event.type == SDL_QUIT )
-			pQuit = true;
-
-		if ( event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID( window ) )
-			pQuit = true;
-
-		if ( ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE) || ( event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_X1 ) )
+		// quit, but with a confirm window to make sure you mean it
+		if ( ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE ) || ( event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_X1 ) ) {
 			quitConfirm = !quitConfirm; // x1 is browser back on the mouse
+		}
 
-		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE && SDL_GetModState() & KMOD_SHIFT )
-			pQuit = true; // force quit on shift+esc ( bypasses confirm window )
+		pQuit = ( event.type == SDL_QUIT ) || // force quit conditions - window close or shift + escape
+				( event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID( window ) ) ||
+				( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE && SDL_GetModState() & KMOD_SHIFT );
 
 		// if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
 		// 	basicScreenShot();	// do the big one via the menus, to avoid accidental trigger
@@ -314,72 +311,71 @@ void engine::handleEvents() {
 			cout << to_string( core.viewerPosition );	// show current position of the viewer
 		}
 
-
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r ) {
 			resetAccumulators();
 		}
 
 		// quaternion based rotation via retained state in the basis vectors - much easier to use than the arbitrary euler angles
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w ) {
-			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisX );	// basisX is the axis, therefore remains untransformed
-			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
-			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
+			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisX ); // basisX is the axis, therefore remains untransformed
+			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
+			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisX );
-			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
-			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
+			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
+			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a ) {
-			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisY );	// same as above, but basisY is the axis
-			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
-			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
+			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisY ); // same as above, but basisY is the axis
+			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
+			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisY );
-			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
-			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f )).xyz();
+			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
+			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisZ ); // and again for basisZ
-			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
-			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
+			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
+			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisZ );
-			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f )).xyz();
-			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f )).xyz();
+			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
+			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
 		}
 
-		// f to reset basis, F to reset basis and home to origin
+		// f to reset basis, shift + f to reset basis and home to origin
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_f ) {
 			if( SDL_GetModState() & KMOD_SHIFT ) {
-				core.viewerPosition = glm::vec3( 0.0, 0.0, 0.0 );
+				core.viewerPosition = glm::vec3( 0.0f, 0.0f, 0.0f );
 			}
 			// reset to default basis
-			core.basisX = glm::vec3( 1.0, 0.0, 0.0 );
-			core.basisY = glm::vec3( 0.0, 1.0, 0.0 );
-			core.basisZ = glm::vec3( 0.0, 0.0, 1.0 );
+			core.basisX = glm::vec3( 1.0f, 0.0f, 0.0f );
+			core.basisY = glm::vec3( 0.0f, 1.0f, 0.0f );
+			core.basisZ = glm::vec3( 0.0f, 0.0f, 1.0f );
 		}
 
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP )
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP ) {
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisZ;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_DOWN )
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_DOWN ) {
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisZ;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RIGHT )
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RIGHT ) {
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisX;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_LEFT )
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_LEFT ) {
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisX;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEUP )
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEUP ) {
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisY;
-
-		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEDOWN )
+		}
+		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEDOWN ) {
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisY;
-
+		}
 	}
 }
 
