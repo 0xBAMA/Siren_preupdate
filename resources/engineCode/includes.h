@@ -99,16 +99,17 @@ using json = nlohmann::json;
 
 enum class renderMode { none, preview, pathtrace };
 struct hostParameters {
-	int screenshotDim = WIDTH; 						// width of the screenshot - the code maintains the aspect ratio of HEIGHT/WIDTH
-	int numSamplesScreenshot = 128; 				// how many samples to take when rendering the screenshot
 	bool movementSinceUpdate = true;				// has the viewer moved since the screen has updated?
-
 	renderMode currentMode = renderMode::preview;	// how should we render the scene?
 	int performanceHistory = 250;					// how many datapoints to keep for tile count / fps
 
 	int tilePerFrameCap = 128;						// max number of tiles allowed to be executed in a frame update
 	int tileSizeUpdated = true;						// (re)builds the tile list
 	int tileSize = 512;								// size of one rendering tile ( square )
+
+	// this stuff is still WIP
+	int screenshotDim = WIDTH; 						// width of the screenshot - the code maintains the aspect ratio of HEIGHT/WIDTH
+	int numSamplesScreenshot = 128; 				// how many samples to take when rendering the screenshot
 };
 
 struct coreParameters {

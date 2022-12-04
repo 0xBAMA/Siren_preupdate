@@ -263,8 +263,11 @@ void engine::imguiPass() {
 	char tileOverlay[ 100 ];
 	char fpsOverlay[ 45 ];
 
-	sprintf( tileOverlay, "avg %.2f tiles/update (%.2f ms/tile)", tileAverage, ( 1000.0f / fpsAverage ) / tileAverage );
-	sprintf( fpsOverlay, "avg %.2f fps (%.2f ms)", fpsAverage, 1000.0f / fpsAverage );
+	const float msPerTile = ( 1000.0f / fpsAverage ) / tileAverage;
+	const float pixelsPerMs = host.tileSize * host.tileSize / ( msPerTile );
+
+	sprintf( tileOverlay, "avg %.2f tiles/update ( %.2f ms / tile, %.2f pixels / ms )", tileAverage, msPerTile, pixelsPerMs );
+	sprintf( fpsOverlay, "avg %.2f fps ( %.2f ms )", fpsAverage, 1000.0f / fpsAverage );
 
 	// absolute positioning within the window
 	ImGui::SetCursorPosY( ImGui::GetWindowSize().y - 215 );
