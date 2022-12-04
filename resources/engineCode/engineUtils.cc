@@ -201,7 +201,7 @@ void engine::imguiPass() {
 			ImGui::SliderInt( "Max Light Bounces", &core.maxBounces, 1, 50 );
 			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0, 1000.0 );
 			ImGui::SliderFloat( "Raymarch Understep", &core.understep, 0.1, 1.0 );
-			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001, 0.1 );
+			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001, 0.1, "%.8f" );
 			ImGui::Separator();
 			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1, 3.6 );
 			ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0, 200.0 );

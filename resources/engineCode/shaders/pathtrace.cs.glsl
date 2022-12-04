@@ -9,33 +9,35 @@ layout( binding = 3, rgba8ui ) uniform uimage2D blueNoise;
 #define AA 1 // each sample is actually 2*2 = 4 offset samples
 
 // core rendering stuff
-uniform ivec2	tileOffset;					// tile renderer offset for the current tile
-uniform ivec2	noiseOffset;				// jitters the noise sample read locations
-uniform int		maxSteps;						// max steps to hit
-uniform int		maxBounces;					// number of pathtrace bounces
-uniform float	maxDistance;				// maximum ray travel
-uniform float understep;					// scale factor on distance, when added as raymarch step
-uniform float	epsilon;						// how close is considered a surface hit
-uniform int		normalMethod;				// selector for normal computation method
-uniform float	focusDistance;			// for thin lens approx
+uniform ivec2	tileOffset;			// tile renderer offset for the current tile
+uniform ivec2	noiseOffset;		// jitters the noise sample read locations
+uniform int		maxSteps;			// max steps to hit
+uniform int		maxBounces;			// number of pathtrace bounces
+uniform float	maxDistance;		// maximum ray travel
+uniform float 	understep;			// scale factor on distance, when added as raymarch step
+uniform float	epsilon;			// how close is considered a surface hit
+uniform int		normalMethod;		// selector for normal computation method
+uniform float	focusDistance;		// for thin lens approx
 uniform float	thinLensIntensity;	// scalar on the thin lens DoF effect
-uniform float	FoV;								// field of view
-uniform float	exposure;						// exposure adjustment
-uniform vec3	viewerPosition;			// position of the viewer
-uniform vec3	basisX;							// x basis vector
-uniform vec3	basisY;							// y basis vector
-uniform vec3	basisZ;							// z basis vector
-uniform int		wangSeed;						// integer value used for seeding the wang hash rng
+uniform float	FoV;				// field of view
+uniform float	exposure;			// exposure adjustment
+uniform vec3	viewerPosition;		// position of the viewer
+uniform vec3	basisX;				// x basis vector
+uniform vec3	basisY;				// y basis vector
+uniform vec3	basisZ;				// z basis vector
+uniform int		wangSeed;			// integer value used for seeding the wang hash rng
 
 // lens parameters
 uniform float lensScaleFactor;		// scales the lens DE
-uniform float lensRadius1;				// radius of the sphere for the first side
-uniform float lensRadius2;				// radius of the sphere for the second side
-uniform float lensThickness;			// offset between the two spheres
-uniform float lensRotate;					// rotating the displacement offset betwee spheres
-uniform float lensIOR;						// index of refraction for the lens
+uniform float lensRadius1;			// radius of the sphere for the first side
+uniform float lensRadius2;			// radius of the sphere for the second side
+uniform float lensThickness;		// offset between the two spheres
+uniform float lensRotate;			// rotating the displacement offset betwee spheres
+uniform float lensIOR;				// index of refraction for the lens
 
 // global state
+	// requires manual management of geo, to ensure that the lens material does not intersect with itself
+float refractState = 1.0; // multiply by the lens distance estimate, to invert when inside a refractive object
 float sampleCount = 0.0;
 
 bool boundsCheck( ivec2 loc ) { // used to abort off-image samples
@@ -109,10 +111,6 @@ vec2 pMod2(inout vec2 p, vec2 size) {
 	return c;
 }
 
-
-
-vec3 hitpointColor = vec3( 0.0 );
-
 // 0 nohit
 #define NOHIT 0
 // 1 diffuse
@@ -124,12 +122,9 @@ vec3 hitpointColor = vec3( 0.0 );
 // 4 refractive
 #define REFRACTIVE 4
 
-// identifier for the hit surface
-int hitpointSurfaceType = 0;
+vec3 hitpointColor = vec3( 0.0 );
+int hitpointSurfaceType = NOHIT; // identifier for the hit surface
 
-// tracking global state wrt state of inside/outside lens material
-	// requires management that the lens material does not intersect with itself
-float refractState = 1.0; // multiply by the lens distance estimate, to invert when inside a refractive object
 float deLens( vec3 p ){
 	// lens SDF
 	p /= lensScaleFactor;
@@ -142,7 +137,7 @@ float deLens( vec3 p ){
 
 	// dFinal = fOpIntersectionRound( sphere1, sphere2, 0.03 );
 	dFinal = max( sphere1, sphere2 );
-	return dFinal * lensScaleFactor;
+	return dFinal * lensScaleFactor * refractState;
 }
 
 void pR( inout vec2 p, float a ) {
@@ -410,35 +405,35 @@ float deLoopy ( vec3 p ) {
   return DE;
 }
 
-
-
 mat3 rotZ ( float t ) {
-  float s = sin( t );
-  float c = cos( t );
-  return mat3( c, s, 0., -s, c, 0., 0., 0., 1. );
+	float s = sin( t );
+	float c = cos( t );
+	return mat3( c, s, 0., -s, c, 0., 0., 0., 1. );
 }
 mat3 rotX ( float t ) {
-  float s = sin( t );
-  float c = cos( t );
-  return mat3( 1., 0., 0., 0., c, s, 0., -s, c );
+	float s = sin( t );
+	float c = cos( t );
+	return mat3( 1., 0., 0., 0., c, s, 0., -s, c );
 }
 mat3 rotY ( float t ) {
-  float s = sin( t );
-  float c = cos( t );
-  return mat3 (c, 0., -s, 0., 1., 0, s, 0, c);
+	float s = sin( t );
+	float c = cos( t );
+	return mat3 (c, 0., -s, 0., 1., 0, s, 0, c);
 }
 float deBowl ( vec3 p ){
-  vec2 rm = radians( 360.0 ) * vec2( 0.468359, 0.95317 ); // vary x,y 0.0 - 1.0
-  mat3 scene_mtx = rotX( rm.x ) * rotY( rm.x ) * rotZ( rm.x ) * rotX( rm.y );
-  float scaleAccum = 1.;
-  for( int i = 0; i < 24; ++i ) {
-    p.yz = sqrt( p.yz * p.yz + 0.16406 );
-    p *= 1.21;
-    scaleAccum *= 1.21;
-    p -= vec3( 2.43307, 5.28488, 0.9685 );
-    p = scene_mtx * p;
-  }
-  return length( p ) / scaleAccum - 0.15;
+	p = rotY( PI / 2.0f ) * p;
+	p = rotZ( PI / 2.0f ) * p;
+	vec2 rm = radians( 360.0 ) * vec2( 0.468359, 0.95317 ); // vary x,y 0.0 - 1.0
+	mat3 scene_mtx = rotX( rm.x ) * rotY( rm.x ) * rotZ( rm.x ) * rotX( rm.y );
+	float scaleAccum = 1.;
+	for ( int i = 0; i < 24; ++i ) {
+		p.yz = sqrt( p.yz * p.yz + 0.16406 );
+		p *= 1.21;
+		scaleAccum *= 1.21;
+		p -= vec3( 2.43307, 5.28488, 0.9685 );
+		p = scene_mtx * p;
+	}
+	return length( p ) / scaleAccum - 0.15;
 }
 
 
@@ -481,7 +476,7 @@ float de( vec3 p ) {
 	// float dFractal = JosKleinian( p );
 	// float dFractal = deLoopy( p - vec3( 0.0, 1.0, 2.0 ) );
 	// float dFractal = 0.05 * deBowl( ( p / 0.05 ) - vec3( 0.0, 1.0, 2.0 ) );
-	float dFractal = 0.05 * deBowl( ( p / 0.05 ) );
+	float dFractal = 0.05 * deBowl( ( p / 0.05 ) - vec3( 0.0, 1.0, 2.0 ) );
 	sceneDist = min( dFractal, sceneDist );
 	if( sceneDist == dFractal && dFractal <= epsilon ) {
 		// hitpointColor = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 10.0 );
@@ -491,12 +486,12 @@ float de( vec3 p ) {
 	}
 
 	// lens object
-	// float dLens = deLens( p );
-	// sceneDist = min( dLens, sceneDist );
-	// if( sceneDist == dLens && dLens <= epsilon ) {
-	// 	hitpointColor = vec3( 0.11 );
-	// 	hitpointSurfaceType = REFRACTIVE;
-	// }
+	float dLens = deLens( p );
+	sceneDist = min( dLens, sceneDist );
+	if( sceneDist == dLens && dLens <= epsilon ) {
+		hitpointColor = vec3( 0.11 );
+		hitpointSurfaceType = REFRACTIVE;
+	}
 
 	// cieling and floor
 	// float dFloorCieling = min( dePlane( p, vec3( 0.0, -1.0, 0.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 1.0, 0.0 ), 7.5 ) );
@@ -538,24 +533,23 @@ float calcAO( in vec3 pos, in vec3 nor ) {
 vec3 normal( vec3 p ) {
 	vec2 e;
 	switch( normalMethod ) {
-
 		case 0: // tetrahedron version, unknown original source - 4 DE evaluations
 			e = vec2( 1.0, -1.0 ) * epsilon / 10.0;
 			return normalize( e.xyy * de( p + e.xyy ) + e.yyx * de( p + e.yyx ) + e.yxy * de( p + e.yxy ) + e.xxx * de( p + e.xxx ) );
 			break;
 
-			case 1: // from iq = more efficient, 4 DE evaluations
-				e = vec2( epsilon, 0.0 ) / 10.0;
-				return normalize( vec3( de( p ) ) - vec3( de( p - e.xyy ), de( p - e.yxy ), de( p - e.yyx ) ) );
-				break;
+		case 1: // from iq = more efficient, 4 DE evaluations
+			e = vec2( epsilon, 0.0 ) / 10.0;
+			return normalize( vec3( de( p ) ) - vec3( de( p - e.xyy ), de( p - e.yxy ), de( p - e.yyx ) ) );
+			break;
 
-			case 2: // from iq - less efficient, 6 DE evaluations
-				e = vec2( epsilon, 0.0 );
-				return normalize( vec3( de( p + e.xyy ) - de( p - e.xyy ), de( p + e.yxy ) - de( p - e.yxy ), de( p + e.yyx ) - de( p - e.yyx ) ) );
-				break;
+		case 2: // from iq - less efficient, 6 DE evaluations
+			e = vec2( epsilon, 0.0 );
+			return normalize( vec3( de( p + e.xyy ) - de( p - e.xyy ), de( p + e.yxy ) - de( p - e.yxy ), de( p + e.yyx ) - de( p - e.yyx ) ) );
+			break;
 
-			default:
-				break;
+		default:
+			break;
 	}
 }
 
@@ -574,31 +568,26 @@ float raymarch( vec3 origin, vec3 direction ) {
 	return dTotal;
 }
 
-
-
 ivec2 location = ivec2( 0, 0 );	// 2d location, pixel coords
 vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 
-// #define DEBUG
-#ifdef DEBUG
-// debug output for testing
-	float rayDistance = raymarch( rayOrigin_in, rayDirection_in );
-	vec3 pHit = rayOrigin_in + rayDistance * rayDirection_in;
-	if( de( rayOrigin_in + rayDistance * rayDirection_in ) < epsilon )
-		return hitpointColor;
-	else
-		return vec3( 0.0 );
-#endif
+	// #define DEBUG
+	#ifdef DEBUG
+	// debug output for testing
+		float rayDistance = raymarch( rayOrigin_in, rayDirection_in );
+		vec3 pHit = rayOrigin_in + rayDistance * rayDirection_in;
+		if( de( rayOrigin_in + rayDistance * rayDirection_in ) < epsilon )
+			return hitpointColor;
+		else
+			return vec3( 0.0 );
+	#endif
 
 	vec3 rayOrigin = rayOrigin_in, previousRayOrigin;
 	vec3 rayDirection = rayDirection_in, previousRayDirection;
 	vec3 finalColor = vec3( 0.0 );
 	vec3 throughput = vec3( 1.0 );
 
-	// jitter ray starting point
-	float startJitterScaleFactor = 0.1;
-	vec4 blue = blueNoiseReference( location );
-	rayOrigin += rayDirection * blue.x * startJitterScaleFactor;
+	rayOrigin += rayDirection;
 
 	// loop to max bounces
 	for( int bounce = 0; bounce < maxBounces; bounce++ ) {
@@ -614,7 +603,7 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 
 		// bump rayOrigin along the normal to prevent false positive hit on next bounce
 			// now you are at least epsilon distance from the surface, so you won't immediately hit
-		rayOrigin += ( 2.0 + 0.1 * blue.y - 0.05 ) * epsilon * hitNormal; // jitter slightly
+		rayOrigin += 2.0f * epsilon * hitNormal;
 
 	// these are mixed per-material
 		// construct new rayDirection vector, diffuse reflection off the surface
@@ -622,7 +611,6 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 
 		vec3 randomVectorDiffuse = normalize( ( 1.0 + epsilon ) * hitNormal + randomUnitVector() );
 		vec3 randomVectorSpecular = normalize( ( 1.0 + epsilon ) * hitNormal + mix( reflectedVector, randomUnitVector(), 0.1 ) );
-
 
 		// currently just implementing diffuse and emissive behavior
 			// eventually add different ray behaviors for each material here
@@ -644,11 +632,12 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 
 			case REFRACTIVE:
 				// ray refracts, instead of bouncing
-				// for now, perfect reflector
+				// for now, perfect reflector with small attenuation
 				rayDirection = reflectedVector;
+				throughput *= 0.97;
 
 				// flip the sign to invert the lens material distance estimate, because the ray is either entering or leaving a refractive medium
-				refractState = -1.0 * refractState;
+				// refractState = -1.0 * refractState;
 				break;
 
 			default:
@@ -694,12 +683,16 @@ vec3 pathtraceSample( ivec2 location, int n ) {
 	vec3  nResult = vec3( 0.0 );
 	float dResult = 0.0;
 
+#if AA != 1
 	// at AA = 2, this is 4 samples per invocation
+	const float normalizeTerm = float( AA * AA );
 	for( int x = 0; x < AA; x++ ) {
 		for( int y = 0; y < AA; y++ ) {
+#endif
+
 			// pixel offset + mapped position
 			// vec2 offset = vec2( x + randomFloat(), y + randomFloat() ) / float( AA ) - 0.5; // previous method
-			vec2 offset = ( getRandomOffset( n ) + vec2( x, y ) ) / float( AA );
+			vec2 offset = getRandomOffset( n );
 			vec2 halfScreenCoord = vec2( imageSize( accumulatorColor ) / 2.0 );
 			vec2 mappedPosition = ( vec2( location + offset ) - halfScreenCoord ) / halfScreenCoord;
 
@@ -723,10 +716,15 @@ vec3 pathtraceSample( ivec2 location, int n ) {
 
 			// get the result for a ray
 			cResult += colorSample( rayOrigin, rayDirection );
+
+#if AA != 1
 		}
 	}
-	float normalizeTerm = float( AA * AA );
 	return ( cResult / normalizeTerm ) * exposure;
+#endif
+
+	// no multisample compensation req'd
+	return cResult * exposure;
 }
 
 void main() {
