@@ -6,7 +6,7 @@ layout( binding = 2, rgba32f ) uniform image2D accumulatorNormalsAndDepth;
 layout( binding = 3, rgba8ui ) uniform uimage2D blueNoise;
 
 #define PI 3.1415926535897932384626433832795
-#define AA 1 // each sample is actually 2*2 = 4 offset samples
+#define AA 1 // AA value of 2 means each sample is actually 2*2 = 4 offset samples
 
 // core rendering stuff
 uniform ivec2	tileOffset;			// tile renderer offset for the current tile
@@ -34,6 +34,11 @@ uniform float lensRadius2;			// radius of the sphere for the second side
 uniform float lensThickness;		// offset between the two spheres
 uniform float lensRotate;			// rotating the displacement offset betwee spheres
 uniform float lensIOR;				// index of refraction for the lens
+
+// scene parameters
+uniform vec3 redWallColor;
+uniform vec3 greenWallColor;
+uniform vec3 metallicDiffuse;
 
 // global state
 	// requires manual management of geo, to ensure that the lens material does not intersect with itself
@@ -450,7 +455,7 @@ float de( vec3 p ) {
 	float dRedWall = dePlane( p, vec3( 1.0, 0.0, 0.0 ), 10.0 );
 	sceneDist = min( dRedWall, sceneDist );
 	if( sceneDist == dRedWall && dRedWall <= epsilon ) {
-		hitpointColor = vec3( 1.0, 0.0, 0.0 );
+		hitpointColor = redWallColor;
 		hitpointSurfaceType = DIFFUSE;
 	}
 
@@ -458,7 +463,7 @@ float de( vec3 p ) {
 	float dGreenWall = dePlane( p, vec3( -1.0, 0.0, 0.0 ), 10.0 );
 	sceneDist = min( dGreenWall, sceneDist );
 	if( sceneDist == dGreenWall && dGreenWall <= epsilon ) {
-		hitpointColor = vec3( 0.0, 1.0, 0.0 );
+		hitpointColor = greenWallColor;
 		hitpointSurfaceType = DIFFUSE;
 	}
 
@@ -481,7 +486,7 @@ float de( vec3 p ) {
 	if( sceneDist == dFractal && dFractal <= epsilon ) {
 		// hitpointColor = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 10.0 );
 		// hitpointColor = vec3( 0.618 );
-		hitpointColor = vec3( 0.618, 0.362, 0.04 );
+		hitpointColor = metallicDiffuse;
 		hitpointSurfaceType = SPECULAR;
 	}
 
@@ -571,16 +576,16 @@ float raymarch( vec3 origin, vec3 direction ) {
 ivec2 location = ivec2( 0, 0 );	// 2d location, pixel coords
 vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 
-	// #define DEBUG
-	#ifdef DEBUG
-	// debug output for testing
-		float rayDistance = raymarch( rayOrigin_in, rayDirection_in );
-		vec3 pHit = rayOrigin_in + rayDistance * rayDirection_in;
-		if( de( rayOrigin_in + rayDistance * rayDirection_in ) < epsilon )
-			return hitpointColor;
-		else
-			return vec3( 0.0 );
-	#endif
+	// // #define DEBUG
+	// #ifdef DEBUG
+	// // debug output for testing
+	// 	float rayDistance = raymarch( rayOrigin_in, rayDirection_in );
+	// 	vec3 pHit = rayOrigin_in + rayDistance * rayDirection_in;
+	// 	if( de( rayOrigin_in + rayDistance * rayDirection_in ) < epsilon )
+	// 		return hitpointColor;
+	// 	else
+	// 		return vec3( 0.0 );
+	// #endif
 
 	vec3 rayOrigin = rayOrigin_in, previousRayOrigin;
 	vec3 rayDirection = rayDirection_in, previousRayDirection;
@@ -659,16 +664,19 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 #define RANDOM
 vec2 getRandomOffset( int n ){
 	// weyl sequence from http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/ and https://www.shadertoy.com/view/4dtBWH
-#ifdef UNIFORM
-		return fract( vec2( 0.0 ) + vec2(n*12664745, n*9560333)/exp2(24.));	// integer mul to avoid round-off
-#endif
-#ifdef UNIFORM2
-		return fract( vec2( 0.0 ) + float(n)*vec2(0.754877669, 0.569840296));
-#endif
-// wang hash random offsets
-#ifdef RANDOM
-		return vec2( randomFloat(), randomFloat() ) ;
-#endif
+	#ifdef UNIFORM
+		return fract( vec2( 0.0f ) + vec2( n * 12664745, n * 9560333 ) / exp2( 24.0 ) );	// integer mul to avoid round-off
+	#endif
+	#ifdef UNIFORM2
+		return fract( vec2( 0.0f ) + float( n ) * vec2( 0.754877669, 0.569840296 ) );
+	#endif
+	// wang hash random offsets
+	#ifdef RANDOM
+		return vec2( randomFloat(), randomFloat() );
+	#endif
+	#ifdef BLUE
+		return blueNoiseReference().xy;
+	#endif
 }
 
 void storeNormalAndDepth( vec3 normal, float depth ) {

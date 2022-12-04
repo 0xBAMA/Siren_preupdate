@@ -23,6 +23,7 @@ private:
 	hostParameters host;
 	coreParameters core;
 	lensParameters lens;
+	sceneParameters scene;
 	postParameters post;
 
 	// initialization

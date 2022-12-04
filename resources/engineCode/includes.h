@@ -138,6 +138,12 @@ struct lensParameters {
 	float lensIOR = 1.2;							// index of refraction of the lens material
 };
 
+struct sceneParameters {
+	glm::vec3 redWallColor		= glm::vec3( 1.0f, 0.0f, 0.0f );
+	glm::vec3 greenWallColor	= glm::vec3( 0.0f, 1.0f, 0.0f );
+	glm::vec3 metallicDiffuse	= glm::vec3( 0.618f, 0.362f, 0.04f );
+};
+
 struct postParameters {
 	int ditherMode = 0;								// colorspace
 	int ditherMethod = 0;							// bitcrush bitcount or exponential scalar

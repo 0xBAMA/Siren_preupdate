@@ -52,6 +52,10 @@ void engine::pathtraceUniformUpdate() {
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensThickness" ), lens.lensThickness );
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensRotate" ), lens.lensRotate );
 	glUniform1f( glGetUniformLocation( pathtraceShader, "lensIOR" ), lens.lensIOR );
+
+	glUniform3f( glGetUniformLocation( pathtraceShader, "redWallColor" ), scene.redWallColor.x, scene.redWallColor.y, scene.redWallColor.z );
+	glUniform3f( glGetUniformLocation( pathtraceShader, "greenWallColor" ), scene.greenWallColor.x, scene.greenWallColor.y, scene.greenWallColor.z );
+	glUniform3f( glGetUniformLocation( pathtraceShader, "metallicDiffuse" ), scene.metallicDiffuse.x, scene.metallicDiffuse.y, scene.metallicDiffuse.z );
 }
 
 void engine::pathtrace() {
@@ -199,13 +203,13 @@ void engine::imguiPass() {
 			// core renderer parameters
 			ImGui::SliderInt( "Max Raymarch Steps", &core.maxSteps, 1, 500 );
 			ImGui::SliderInt( "Max Light Bounces", &core.maxBounces, 1, 50 );
-			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0, 1000.0 );
+			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0, 200.0 );
 			ImGui::SliderFloat( "Raymarch Understep", &core.understep, 0.1, 1.0 );
-			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001, 0.1, "%.8f" );
+			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001, 0.1, "%.4f" );
 			ImGui::Separator();
 			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1, 3.6 );
-			ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0, 200.0 );
-			ImGui::SliderFloat( "Thin Lens Effect Intensity", &core.thinLensIntensity, 0.0, 5.0 );
+			// ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0, 200.0 );
+			// ImGui::SliderFloat( "Thin Lens Effect Intensity", &core.thinLensIntensity, 0.0, 5.0 );
 			ImGui::Separator();
 			ImGui::SliderInt( "SDF Normal Method", &core.normalMethod, 1, 3 );
 			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01, 2.5 );
@@ -218,14 +222,19 @@ void engine::imguiPass() {
 
 			ImGui::EndTabItem();
 		}
-		if ( ImGui::BeginTabItem( " Lens " ) ) {
+		if ( ImGui::BeginTabItem( " Lens / Model " ) ) {
 			// lens geometry parameters
-			ImGui::SliderFloat( "Lens Scale Factor", &lens.lensScaleFactor, 0.1, 10.0 );
+			ImGui::SliderFloat( "Lens Scale Factor", &lens.lensScaleFactor, 0.001, 2.5 );
 			ImGui::SliderFloat( "Lens Radius 1", &lens.lensRadius1, 0.01, 10.0 );
 			ImGui::SliderFloat( "Lens Radius 2", &lens.lensRadius2, 0.01, 10.0 );
 			ImGui::SliderFloat( "Lens Thickness", &lens.lensThickness, 0.01, 10.0 );
 			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -35.0, 35.0 );
 			ImGui::SliderFloat( "Lens IOR", &lens.lensIOR, 0.0, 2.0 );
+			ImGui::Separator();
+			ImGui::ColorEdit3( "Red Wall Color", ( float * ) &scene.redWallColor, ImGuiColorEditFlags_PickerHueWheel );
+			ImGui::ColorEdit3( "Green Wall Color", ( float * ) &scene.greenWallColor, ImGuiColorEditFlags_PickerHueWheel );
+			ImGui::ColorEdit3( "Metallic Diffuse", ( float * ) &scene.metallicDiffuse, ImGuiColorEditFlags_PickerHueWheel );
+			ImGui::Separator();
 			ImGui::EndTabItem();
 		}
 		if ( ImGui::BeginTabItem( " Post " ) ) {
