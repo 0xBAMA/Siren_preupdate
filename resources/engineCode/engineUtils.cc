@@ -188,7 +188,10 @@ void engine::imguiPass() {
 			// what else?
 			// buttons, controls for the renderer state
 				// trigger random tile glitch behaviors
-				// RESET button - zero sample count for all tiles ( + keyboard shortcut to do this as well )
+
+			if ( ImGui::SmallButton( "Reset Buffer Samples" ) ) {
+				resetAccumulators(); // also triggered by 'r'
+			}
 
 			ImGui::EndTabItem();
 		}
@@ -307,12 +310,14 @@ void engine::handleEvents() {
 		// if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_s )
 		// 	basicScreenShot();	// do the big one via the menus, to avoid accidental trigger
 
-		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_p )
+		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_p ) {
 			cout << to_string( core.viewerPosition );	// show current position of the viewer
+		}
 
 
-		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r )
+		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r ) {
 			resetAccumulators();
+		}
 
 		// quaternion based rotation via retained state in the basis vectors - much easier to use than the arbitrary euler angles
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_w ) {
