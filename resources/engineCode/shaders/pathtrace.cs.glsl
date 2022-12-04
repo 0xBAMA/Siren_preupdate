@@ -42,24 +42,24 @@ uniform vec3 metallicDiffuse;
 
 // global state
 	// requires manual management of geo, to ensure that the lens material does not intersect with itself
-float refractState = 1.0; // multiply by the lens distance estimate, to invert when inside a refractive object
-float sampleCount = 0.0;
+float refractState = 1.0f; // multiply by the lens distance estimate, to invert when inside a refractive object
+float sampleCount = 0.0f;
 
-bool boundsCheck( ivec2 loc ) { // used to abort off-image samples
+bool boundsCheck ( ivec2 loc ) { // used to abort off-image samples
 	ivec2 bounds = ivec2( imageSize( accumulatorColor ) ).xy;
 	return ( loc.x < bounds.x && loc.y < bounds.y );
 }
 
-vec4 blueNoiseReference( ivec2 location ) { // jitter source
+vec4 blueNoiseReference ( ivec2 location ) { // jitter source
 	location += noiseOffset;
 	location.x = location.x % imageSize( blueNoise ).x;
 	location.y = location.y % imageSize( blueNoise ).y;
-	return vec4( imageLoad( blueNoise, location ) / 255. );
+	return vec4( imageLoad( blueNoise, location ) / 255.0f );
 }
 
 // random utilites
 uint seed = 0;
-uint wangHash() {
+uint wangHash () {
 	seed = uint( seed ^ uint( 61 ) ) ^ uint( seed >> uint( 16 ) );
 	seed *= uint( 9 );
 	seed = seed ^ ( seed >> 4 );
@@ -68,28 +68,28 @@ uint wangHash() {
 	return seed;
 }
 
-float randomFloat() {
-	return float( wangHash() ) / 4294967296.0;
+float randomFloat () {
+	return float( wangHash() ) / 4294967296.0f;
 }
 
-vec3 randomUnitVector() {
+vec3 randomUnitVector () {
 	float z = randomFloat() * 2.0f - 1.0f;
-	float a = randomFloat() * 2. * PI;
+	float a = randomFloat() * 2.0f * PI;
 	float r = sqrt( 1.0f - z * z );
 	float x = r * cos( a );
 	float y = r * sin( a );
 	return vec3( x, y, z );
 }
 
-vec2 randomInUnitDisk() {
+vec2 randomInUnitDisk () {
 	return randomUnitVector().xy;
 }
 
-mat3 rotate3D( float angle, vec3 axis ) {
+mat3 rotate3D ( float angle, vec3 axis ) {
 	vec3 a = normalize( axis );
 	float s = sin( angle );
 	float c = cos( angle );
-	float r = 1.0 - c;
+	float r = 1.0f - c;
 	return mat3(
 		a.x * a.x * r + c,
 		a.y * a.x * r + a.z * s,
@@ -103,16 +103,15 @@ mat3 rotate3D( float angle, vec3 axis ) {
 	);
 }
 
-
-float fOpIntersectionRound(float a, float b, float r) {
-	vec2 u = max(vec2(r + a,r + b), vec2(0));
-	return min(-r, max (a, b)) + length(u);
+float fOpIntersectionRound ( float a, float b, float r ) {
+	vec2 u = max( vec2( r + a, r + b ), vec2( 0.0f ) );
+	return min( -r, max ( a, b ) ) + length( u );
 }
 
 // Repeat in two dimensions
-vec2 pMod2(inout vec2 p, vec2 size) {
-	vec2 c = floor((p + size*0.5)/size);
-	p = mod(p + size*0.5,size) - size*0.5;
+vec2 pMod2 ( inout vec2 p, vec2 size ) {
+	vec2 c = floor( ( p + size * 0.5f ) / size );
+	p = mod( p + size * 0.5f, size ) - size * 0.5f;
 	return c;
 }
 
@@ -127,365 +126,150 @@ vec2 pMod2(inout vec2 p, vec2 size) {
 // 4 refractive
 #define REFRACTIVE 4
 
-vec3 hitpointColor = vec3( 0.0 );
+vec3 hitpointColor = vec3( 0.0f );
 int hitpointSurfaceType = NOHIT; // identifier for the hit surface
-
-float deLens( vec3 p ){
+float deLens ( vec3 p ){
 	// lens SDF
 	p /= lensScaleFactor;
 	float dFinal;
-	float center1 = lensRadius1 - lensThickness / 2.0;
-	float center2 = -lensRadius2 + lensThickness / 2.0;
-	vec3 pRot = rotate3D( 0.1 * lensRotate, vec3( 1.0 ) ) * p;
-	float sphere1 = distance( pRot, vec3( 0.0, center1, 0.0 ) ) - lensRadius1;
-	float sphere2 = distance( pRot, vec3( 0.0, center2, 0.0 ) ) - lensRadius2;
+	float center1 = lensRadius1 - lensThickness / 2.0f;
+	float center2 = -lensRadius2 + lensThickness / 2.0f;
+	vec3 pRot = rotate3D( 0.1f * lensRotate, vec3( 1.0f ) ) * p;
+	float sphere1 = distance( pRot, vec3( 0.0f, center1, 0.0f ) ) - lensRadius1;
+	float sphere2 = distance( pRot, vec3( 0.0f, center2, 0.0f ) ) - lensRadius2;
 
 	// dFinal = fOpIntersectionRound( sphere1, sphere2, 0.03 );
 	dFinal = max( sphere1, sphere2 );
 	return dFinal * lensScaleFactor * refractState;
 }
 
-void pR( inout vec2 p, float a ) {
-	p = cos( a ) * p + sin( a ) * vec2( p.y, -p.x );
-}
-
-float deFractal(vec3 p){
-	float scalar = 0.3;
-	p /= scalar;
-
-	const int iterations = 20;
-	float d = ( p.z * scalar ) * 2.0;
-	// float d = -2.; // vary this parameter, range is like -20 to 20
-	p=p.yxz;
-	pR(p.yz, 1.570795);
-	p.x += 6.5;
-	p.yz = mod(abs(p.yz)-.0, 20.) - 10.;
-	float scale = 1.25;
-	p.xy /= (1.+d*d*0.0005);
-
-	float l = 0.;
-	for (int i=0; i < iterations; i++) {
-		p.xy = abs(p.xy);
-		p = p*scale + vec3(-3. + d*0.0095,-1.5,-.5);
-		pR(p.xy,0.35-d*0.015);
-		pR(p.yz,0.5+d*0.02);
-		vec3 p6 = p*p*p; p6=p6*p6;
-		l =pow(p6.x + p6.y + p6.z, 1./6.);
-	}
-	return ( l * pow( scale, -float( iterations ) ) - 0.15 ) * scalar;
-}
-
-float deFractal2( vec3 p ){
-	float s = 2.;
-	float e = 0.;
-	for(int j=0;++j<7;)
-		p.xz=abs(p.xz)-2.3,
-		p.z>p.x?p=p.zyx:p,
-		p.z=1.5-abs(p.z-1.3+sin(p.z)*.2),
-		p.y>p.x?p=p.yxz:p,
-		p.x=3.-abs(p.x-5.+sin(p.x*3.)*.2),
-		p.y>p.x?p=p.yxz:p,
-		p.y=.9-abs(p.y-.4),
-		e=12.*clamp(.3/min(dot(p,p),1.),.0,1.)+
-		2.*clamp(.1/min(dot(p,p),1.),.0,1.),
-		p=e*p-vec3(7,1,1),
-		s*=e;
-	return length(p)/s;
-}
-
-float dePlane( vec3 p, vec3 normal, float distanceFromOrigin ) {
+float dePlane ( vec3 p, vec3 normal, float distanceFromOrigin ) {
 	return dot( p, normal ) + distanceFromOrigin;
 }
 
-// Jos Leys / Knighty
-// https://www.shadertoy.com/view/XlVXzh
-// vec2 wrap(vec2 x, vec2 a, vec2 s){
-//     x -= s;
-//     return (x-a*floor(x/a)) + s;
-// }
-//
-// void TransA(inout vec3 z, inout float DF, float a, float b){
-//     float iR = 1. / dot(z,z);
-//     z *= -iR;
-//     z.x = -b - z.x; z.y = a + z.y;
-//     DF *= max(1.,iR);
-// }
-//
-// float JosKleinian(vec3 z) {
-//     float adjust = 6.28; // use this for time varying behavior
-//
-//     float box_size_x=1.;
-//     float box_size_z=1.;
-//
-//     float KleinR = 1.94+0.05*abs(sin(-adjust*0.5));//1.95859103011179;
-//     float KleinI = 0.03*cos(-adjust*0.5);//0.0112785606117658;
-//     vec3 lz=z+vec3(1.), llz=z+vec3(-1.);
-//     float d=0.; float d2=0.;
-//
-//     vec3 InvCenter=vec3(1.0,1.0,0.);
-//     float rad=0.8;
-//     z=z-InvCenter;
-//     d=length(z);
-//     d2=d*d;
-//     z=(rad*rad/d2)*z+InvCenter;
-//
-//     float DE=1e10;
-//     float DF = 1.0;
-//     float a = KleinR;
-//     float b = KleinI;
-//     float f = sign(b)*1. ;
-//     for (int i = 0; i < 69 ; i++)
-//     {
-//         z.x=z.x+b/a*z.y;
-//         z.xz = wrap(z.xz, vec2(2. * box_size_x, 2. * box_size_z), vec2(- box_size_x, - box_size_z));
-//         z.x=z.x-b/a*z.y;
-//
-//         //If above the separation line, rotate by 180° about (-b/2, a/2)
-//         if  (z.y >= a * 0.5 + f *(2.*a-1.95)/4. * sign(z.x + b * 0.5)* (1. - exp(-(7.2-(1.95-a)*15.)* abs(z.x + b * 0.5))))
-//         {z = vec3(-b, a, 0.) - z;}
-//
-//         //Apply transformation a
-//         TransA(z, DF, a, b);
-//
-//         //If the iterated points enters a 2-cycle , bail out.
-//         if(dot(z-llz,z-llz) < 1e-5) {break;}
-//
-//         //Store prévious iterates
-//         llz=lz; lz=z;
-//     }
-//
-//
-//     float y =  min(z.y, a-z.y) ;
-//     DE=min(DE,min(y,0.3)/max(DF,2.));
-//     DE=DE*d2/(rad+d*DE);
-//     return DE;
-// }
-
-vec4 QtSqr ( vec4 q ){
-  return vec4 (2. * q.w * q.xyz, q.w * q.w - dot (q.xyz, q.xyz));
-}
-vec4 QtCub ( vec4 q ){
-  float b;
-  b = dot (q.xyz, q.xyz);
-  return vec4 (q.xyz * (3. * q.w * q.w - b), q.w * (q.w * q.w - 3. * b));
-}
-float nHit; // escape term
-float ObjDf ( vec3 p ){
-  vec4 q, qq, c;
-  vec2 b;
-  float s, ss, ot;
-  q = vec4 (p, 0.).yzwx;
-  c = vec4 (0.2727, 0.6818, -0.2727, -0.0909);
-  b = vec2 (0.45, 0.55);
-  s = 0.;
-  ss = 1.;
-  ot = 100.;
-  nHit = 0.;
-  for (int j = 0; j < 256; j ++) {
-    ++ nHit;
-    qq = QtSqr (q);
-    ss *= 9. * dot (qq, qq);
-    q = QtCub (q) + c;
-    ot = min (ot, length (q.wy - b) - 0.1);
-    s = dot (q, q);
-    if (s > 32.) break;
-  }
-  return min (ot, max (0.25 * log (s) * sqrt (s / ss) - 0.001, 0.));
-}
-float deFractal3(vec3 p){
-    return max( ObjDf(p), p.y );
-}
-
-
-vec2 box_size = vec2(-0.40445, 0.34) * 2.;
-
 //sphere inversion
-bool SI=false;
-vec3 InvCenter=vec3(0,1,1);
-float rad=.8;
-
+bool SI = false;
+vec3 InvCenter = vec3( 0.0f, 1.0f, 1.0f );
+float rad = 0.8f;
+vec2 box_size = vec2( -0.40445f, 0.34f ) * 2.0f;
 vec2 wrap ( vec2 x, vec2 a, vec2 s ) {
-    x -= s;
-    return (x - a * floor(x / a)) + s;
+	x -= s;
+	return ( x - a * floor( x / a ) ) + s;
 }
-
-void TransA(inout vec3 z, inout float DF, float a, float b){
-    float iR = 1. / dot(z,z);
-    z *= -iR;
-    z.x = -b - z.x; z.y = a + z.y;
-    DF *= iR;//max(1.,iR);
+void TransA ( inout vec3 z, inout float DF, float a, float b ) {
+	float iR = 1.0f / dot( z, z );
+	z *= -iR;
+	z.x = -b - z.x;
+	z.y = a + z.y;
+	DF *= iR;//max(1.,iR);
 }
-
-float JosKleinian(vec3 z)
-{
-    float t = 0.;
-
-    float KleinR = 1.5 + .39;
-    float KleinI = (.55 * 2. - 1.);
-    vec3 lz=z+vec3(1.), llz=z+vec3(-1.);
-    float d=0.; float d2=0.;
-
-    if (SI) {
-        z=z-InvCenter;
-        d=length(z);
-        d2=d*d;
-        z=(rad*rad/d2)*z+InvCenter;
-    }
-
-    float DE = 1e12;
-    float DF = 1.;
-    float a = KleinR;
-    float b = KleinI;
-    float f = sign(b) * .45;
-    for (int i = 0; i < 80 ; i++)
-    {
-        z.x += b / a * z.y;
-        z.xz = wrap(z.xz, box_size * 2., -box_size);
-        z.x -= b / a * z.y;
-
-        //If above the separation line, rotate by 180° about (-b/2, a/2)
-        if  (z.y >= a * 0.5 + f *(2.*a-1.95)/4. * sign(z.x + b * 0.5)* (1. - exp(-(7.2-(1.95-a)*15.)* abs(z.x + b * 0.5))))
-        {z = vec3(-b, a, 0.) - z;}
-
-        //Apply transformation a
-        TransA(z, DF, a, b);
-
-        //If the iterated points enters a 2-cycle , bail out.
-        if(dot(z-llz,z-llz) < 1e-5) {break;}
-
-        //Store prévious iterates
-        llz=lz; lz=z;
-    }
-
-    float y =  min(z.y, a - z.y);
-    DE = min(DE, min(y, .3) / max(DF, 2.));
-    if (SI) {
-        DE = DE * d2 / (rad + d * DE);
-    }
-
-    return DE;
-}
-
-
-
-// Spherical Inversion Variant of Above
 float deLoopy ( vec3 p ) {
 	p = p.yzx;
-  float adjust = 6.28; // use this for time varying behavior
-  float box_size_x = 1.0;
-  float box_size_z = 1.0;
-  float KleinR = 1.95859103011179;
-  float KleinI = 0.0112785606117658;
-  vec3 lz = p + vec3( 1.0 ), llz = p + vec3( -1.0 );
-  float d = 0.0; float d2 = 0.0;
-  vec3 InvCenter = vec3( 1.0, 1.0, 0.0 );
-  float rad = 0.8;
-  p = p - InvCenter;
-  d = length( p );
-  d2 = d * d;
-  p = ( rad * rad / d2 ) * p + InvCenter;
-  float DE = 1e10;
-  float DF = 1.0;
-  float a = KleinR;
-  float b = KleinI;
-  float f = sign( b ) * 1.0;
-  for ( int i = 0; i < 69 ; i++ ) {
-    p.x = p.x + b / a * p.y;
-    p.xz = wrap( p.xz, vec2( 2. * box_size_x, 2. * box_size_z ), vec2( -box_size_x, - box_size_z ) );
-    p.x = p.x - b / a * p.y;
-    if ( p.y >= a * 0.5 + f *( 2.0 * a - 1.95 ) / 4.0 * sign( p.x + b * 0.5 ) *
-     ( 1.0 - exp( -( 7.2 - ( 1.95 - a ) * 15.0 )* abs( p.x + b * 0.5 ) ) ) ) {
-      p = vec3( -b, a, 0.0 ) - p;
-    } //If above the separation line, rotate by 180° about (-b/2, a/2)
-    TransA( p, DF, a, b ); //Apply transformation a
-    if ( dot( p - llz, p - llz ) < 1e-5 ) {
-      break;
-    } //If the iterated points enters a 2-cycle , bail out.
-    llz = lz; lz = p; //Store previous iterates
-  }
-
-  float y =  min( p.y, a-p.y );
-  DE = min( DE, min( y, 0.3 ) / max( DF, 2.0 ) );
-  DE = DE * d2 / ( rad + d * DE );
-  return DE;
+	float adjust = 6.28f; // use this for time varying behavior
+	float box_size_x = 1.0f;
+	float box_size_z = 1.0f;
+	float KleinR = 1.95859103011179f;
+	float KleinI = 0.0112785606117658f;
+	vec3 lz = p + vec3( 1.0f ), llz = p + vec3( -1.0f );
+	float d = 0.0f; float d2 = 0.0f;
+	vec3 InvCenter = vec3( 1.0f, 1.0f, 0.0f );
+	float rad = 0.8f;
+	p = p - InvCenter;
+	d = length( p );
+	d2 = d * d;
+	p = ( rad * rad / d2 ) * p + InvCenter;
+	float DE = 1e10f;
+	float DF = 1.0f;
+	float a = KleinR;
+	float b = KleinI;
+	float f = sign( b ) * 1.0f;
+	for ( int i = 0; i < 69; i++ ) {
+		p.x = p.x + b / a * p.y;
+		p.xz = wrap( p.xz, vec2( 2.0f * box_size_x, 2.0f * box_size_z ), vec2( -box_size_x, - box_size_z ) );
+		p.x = p.x - b / a * p.y;
+		if ( p.y >= a * 0.5f + f *( 2.0f * a - 1.95f ) / 4.0f * sign( p.x + b * 0.5f ) * ( 1.0f - exp( -( 7.2f - ( 1.95f - a ) * 15.0f )* abs( p.x + b * 0.5f ) ) ) ) {
+			p = vec3( -b, a, 0.0f ) - p; //If above the separation line, rotate by 180° about (-b/2, a/2)
+		}
+		TransA( p, DF, a, b ); //Apply transformation a
+		if ( dot( p - llz, p - llz ) < 1e-5f ) {
+			break; //If the iterated points enters a 2-cycle , bail out.
+		}
+		llz = lz; lz = p; //Store previous iterates
+	}
+	float y = min( p.y, a-p.y );
+	DE = min( DE, min( y, 0.3f ) / max( DF, 2.0f ) );
+	DE = DE * d2 / ( rad + d * DE );
+	return DE;
 }
 
 mat3 rotZ ( float t ) {
 	float s = sin( t );
 	float c = cos( t );
-	return mat3( c, s, 0., -s, c, 0., 0., 0., 1. );
+	return mat3( c, s, 0.0f, -s, c, 0.0f, 0.0f, 0.0f, 1.0f );
 }
 mat3 rotX ( float t ) {
 	float s = sin( t );
 	float c = cos( t );
-	return mat3( 1., 0., 0., 0., c, s, 0., -s, c );
+	return mat3( 1.0f, 0.0f, 0.0f, 0.0f, c, s, 0.0f, -s, c );
 }
 mat3 rotY ( float t ) {
 	float s = sin( t );
 	float c = cos( t );
-	return mat3 (c, 0., -s, 0., 1., 0, s, 0, c);
+	return mat3( c, 0.0f, -s, 0.0f, 1.0f, 0.0f, s, 0.0f, c );
 }
-float deBowl ( vec3 p ){
+float deBowl ( vec3 p ) {
 	p = rotY( PI / 2.0f ) * p;
 	p = rotZ( PI / 2.0f ) * p;
-	vec2 rm = radians( 360.0 ) * vec2( 0.468359, 0.95317 ); // vary x,y 0.0 - 1.0
+	vec2 rm = radians( 360.0f ) * vec2( 0.468359f, 0.95317f ); // vary x,y 0.0 - 1.0
 	mat3 scene_mtx = rotX( rm.x ) * rotY( rm.x ) * rotZ( rm.x ) * rotX( rm.y );
 	float scaleAccum = 1.;
 	for ( int i = 0; i < 24; ++i ) {
-		p.yz = sqrt( p.yz * p.yz + 0.16406 );
-		p *= 1.21;
-		scaleAccum *= 1.21;
-		p -= vec3( 2.43307, 5.28488, 0.9685 );
+		p.yz = sqrt( p.yz * p.yz + 0.16406f );
+		p *= 1.21f;
+		scaleAccum *= 1.21f;
+		p -= vec3( 2.43307f, 5.28488f, 0.9685f );
 		p = scene_mtx * p;
 	}
-	return length( p ) / scaleAccum - 0.15;
+	return length( p ) / scaleAccum - 0.15f;
 }
 
-
-
 // surface distance estimate for the whole scene
-float de( vec3 p ) {
+float de ( vec3 p ) {
 	// init nohit, far from surface, no diffuse color
 	hitpointSurfaceType = NOHIT;
-	float sceneDist = 1000.0;
-	hitpointColor = vec3( 0.0 );
+	float sceneDist = 1000.0f;
+	hitpointColor = vec3( 0.0f );
 
 	// cornell box
 	// red wall ( left )
-	float dRedWall = dePlane( p, vec3( 1.0, 0.0, 0.0 ), 10.0 );
+	float dRedWall = dePlane( p, vec3( 1.0f, 0.0f, 0.0f ), 10.0f );
 	sceneDist = min( dRedWall, sceneDist );
-	if( sceneDist == dRedWall && dRedWall <= epsilon ) {
+	if ( sceneDist == dRedWall && dRedWall <= epsilon ) {
 		hitpointColor = redWallColor;
 		hitpointSurfaceType = DIFFUSE;
 	}
 
 	// green wall ( right )
-	float dGreenWall = dePlane( p, vec3( -1.0, 0.0, 0.0 ), 10.0 );
+	float dGreenWall = dePlane( p, vec3( -1.0f, 0.0f, 0.0f ), 10.0f );
 	sceneDist = min( dGreenWall, sceneDist );
-	if( sceneDist == dGreenWall && dGreenWall <= epsilon ) {
+	if ( sceneDist == dGreenWall && dGreenWall <= epsilon ) {
 		hitpointColor = greenWallColor;
 		hitpointSurfaceType = DIFFUSE;
 	}
 
 	// white walls ( front and back )
-	// float dWhiteWalls = min( dePlane( p, vec3( 0.0, 0.0, 1.0 ), 20.0 ),  dePlane( p, vec3( 0.0, 0.0, -1.0 ), 20.0 ) );
-	// // float dWhiteWalls = dePlane( p, vec3( 0.0, 0.0, 1.0 ), 16.0 ); // back only
-	// sceneDist = min( dWhiteWalls, sceneDist );
-	// if( sceneDist == dWhiteWalls && dWhiteWalls <= epsilon ) {
-	// 	hitpointColor = vec3( 0.78 );
-	// 	hitpointSurfaceType = DIFFUSE;
-	// }
+	// float dWhiteWalls = min( dePlane( p, vec3( 0.0f, 0.0f, 1.0f ), 20.0f ),  dePlane( p, vec3( 0.0f, 0.0f, -1.0f ), 20.0f ) );
+	float dWhiteWalls = dePlane( p, vec3( 0.0f, 0.0f, 1.0f ), 16.0f ); // back only
+	sceneDist = min( dWhiteWalls, sceneDist );
+	if ( sceneDist == dWhiteWalls && dWhiteWalls <= epsilon ) {
+		hitpointColor = vec3( 0.78f );
+		hitpointSurfaceType = DIFFUSE;
+	}
 
 	// fractal object
-	// float dFractal = deFractal( p );
-	// float dFractal = JosKleinian( p );
-	// float dFractal = deLoopy( p - vec3( 0.0, 1.0, 2.0 ) );
-	// float dFractal = 0.05 * deBowl( ( p / 0.05 ) - vec3( 0.0, 1.0, 2.0 ) );
-	float dFractal = 0.05 * deBowl( ( p / 0.05 ) - vec3( 0.0, 1.0, 2.0 ) );
+	float dFractal = 0.05f * deBowl( ( p / 0.05f ) - vec3( 0.0f, 1.0f, 2.0f ) );
 	sceneDist = min( dFractal, sceneDist );
-	if( sceneDist == dFractal && dFractal <= epsilon ) {
-		// hitpointColor = mix( vec3( 0.28, 0.42, 0.56 ), vec3( 0.55, 0.22, 0.1 ), ( p.z + 10.0 ) / 10.0 );
-		// hitpointColor = vec3( 0.618 );
+	if ( sceneDist == dFractal && dFractal <= epsilon ) {
 		hitpointColor = metallicDiffuse;
 		hitpointSurfaceType = SPECULAR;
 	}
@@ -493,25 +277,24 @@ float de( vec3 p ) {
 	// lens object
 	float dLens = deLens( p );
 	sceneDist = min( dLens, sceneDist );
-	if( sceneDist == dLens && dLens <= epsilon ) {
-		hitpointColor = vec3( 0.11 );
+	if ( sceneDist == dLens && dLens <= epsilon ) {
+		hitpointColor = vec3( 0.11f );
 		hitpointSurfaceType = REFRACTIVE;
 	}
 
 	// cieling and floor
-	// float dFloorCieling = min( dePlane( p, vec3( 0.0, -1.0, 0.0 ), 10.0 ),  dePlane( p, vec3( 0.0, 1.0, 0.0 ), 7.5 ) );
-	float dFloorCieling = dePlane( p, vec3( 0.0, 1.0, 0.0 ), 10.0 );
+	float dFloorCieling = min( dePlane( p, vec3( 0.0f, -1.0f, 0.0f ), 10.0f ),  dePlane( p, vec3( 0.0f, 1.0f, 0.0f ), 7.5f ) );
 	sceneDist = min( dFloorCieling, sceneDist );
-	if( sceneDist == dFloorCieling && dFloorCieling <= epsilon ) {
-		hitpointColor = vec3( 0.9 );
+	if ( sceneDist == dFloorCieling && dFloorCieling <= epsilon ) {
+		hitpointColor = vec3( 0.9f );
 		hitpointSurfaceType = DIFFUSE;
 	}
 
-	pMod2( p.xz, vec2( 2.0 ) );
-	float dLightBall = distance( p, vec3( 0.0, 7.5, 0.0 ) ) - 0.1618;
+	pMod2( p.xz, vec2( 2.0f ) );
+	float dLightBall = distance( p, vec3( 0.0f, 7.5f, 0.0f ) ) - 0.1618f;
 	sceneDist = min( dLightBall, sceneDist );
-	if( sceneDist == dLightBall && dLightBall <= epsilon ) {
-		hitpointColor = vec3( 0.8 );
+	if ( sceneDist == dLightBall && dLightBall <= epsilon ) {
+		hitpointColor = vec3( 0.8f );
 		hitpointSurfaceType = EMISSIVE;
 	}
 
@@ -522,34 +305,34 @@ float de( vec3 p ) {
 }
 
 // fake AO, computed from SDF
-float calcAO( in vec3 pos, in vec3 nor ) {
-	float occ = 0.0;
-	float sca = 1.0;
+float calcAO ( in vec3 pos, in vec3 nor ) {
+	float occ = 0.0f;
+	float sca = 1.0f;
 	for( int i = 0; i < 5; i++ ) {
-		float h = 0.001 + 0.15 * float( i ) / 4.0;
+		float h = 0.001f + 0.15f * float( i ) / 4.0f;
 		float d = de( pos + h * nor );
 		occ += ( h - d ) * sca;
-		sca *= 0.95;
+		sca *= 0.95f;
 	}
-	return clamp( 1.0 - 1.5 * occ, 0.0, 1.0 );
+	return clamp( 1.0f - 1.5f * occ, 0.0f, 1.0f );
 }
 
 // normalized gradient of the SDF - 3 different methods
-vec3 normal( vec3 p ) {
+vec3 normal ( vec3 p ) {
 	vec2 e;
 	switch( normalMethod ) {
 		case 0: // tetrahedron version, unknown original source - 4 DE evaluations
-			e = vec2( 1.0, -1.0 ) * epsilon / 10.0;
+			e = vec2( 1.0f, -1.0f ) * epsilon / 10.0f;
 			return normalize( e.xyy * de( p + e.xyy ) + e.yyx * de( p + e.yyx ) + e.yxy * de( p + e.yxy ) + e.xxx * de( p + e.xxx ) );
 			break;
 
 		case 1: // from iq = more efficient, 4 DE evaluations
-			e = vec2( epsilon, 0.0 ) / 10.0;
+			e = vec2( epsilon, 0.0f ) / 10.0f;
 			return normalize( vec3( de( p ) ) - vec3( de( p - e.xyy ), de( p - e.yxy ), de( p - e.yyx ) ) );
 			break;
 
 		case 2: // from iq - less efficient, 6 DE evaluations
-			e = vec2( epsilon, 0.0 );
+			e = vec2( epsilon, 0.0f );
 			return normalize( vec3( de( p + e.xyy ) - de( p - e.xyy ), de( p + e.yxy ) - de( p - e.yxy ), de( p + e.yyx ) - de( p - e.yyx ) ) );
 			break;
 
@@ -559,9 +342,9 @@ vec3 normal( vec3 p ) {
 }
 
 // raymarches to the next hit
-float raymarch( vec3 origin, vec3 direction ) {
-	float dQuery = 0.0;
-	float dTotal = 0.0;
+float raymarch ( vec3 origin, vec3 direction ) {
+	float dQuery = 0.0f;
+	float dTotal = 0.0f;
 	for ( int steps = 0; steps < maxSteps; steps++ ) {
 		vec3 pQuery = origin + dTotal * direction;
 		dQuery = de( pQuery );
@@ -574,7 +357,7 @@ float raymarch( vec3 origin, vec3 direction ) {
 }
 
 ivec2 location = ivec2( 0, 0 );	// 2d location, pixel coords
-vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
+vec3 colorSample ( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 
 	// // #define DEBUG
 	// #ifdef DEBUG
@@ -589,8 +372,8 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 
 	vec3 rayOrigin = rayOrigin_in, previousRayOrigin;
 	vec3 rayDirection = rayDirection_in, previousRayDirection;
-	vec3 finalColor = vec3( 0.0 );
-	vec3 throughput = vec3( 1.0 );
+	vec3 finalColor = vec3( 0.0f );
+	vec3 throughput = vec3( 1.0f );
 
 	rayOrigin += rayDirection;
 
@@ -614,8 +397,8 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 		// construct new rayDirection vector, diffuse reflection off the surface
 		vec3 reflectedVector = reflect( previousRayDirection, hitNormal );
 
-		vec3 randomVectorDiffuse = normalize( ( 1.0 + epsilon ) * hitNormal + randomUnitVector() );
-		vec3 randomVectorSpecular = normalize( ( 1.0 + epsilon ) * hitNormal + mix( reflectedVector, randomUnitVector(), 0.1 ) );
+		vec3 randomVectorDiffuse = normalize( ( 1.0f + epsilon ) * hitNormal + randomUnitVector() );
+		vec3 randomVectorSpecular = normalize( ( 1.0f + epsilon ) * hitNormal + mix( reflectedVector, randomUnitVector(), 0.1f ) );
 
 		// currently just implementing diffuse and emissive behavior
 			// eventually add different ray behaviors for each material here
@@ -631,7 +414,7 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 				break;
 
 			case SPECULAR:
-				rayDirection = mix( randomVectorDiffuse, randomVectorSpecular, 0.7 );
+				rayDirection = mix( randomVectorDiffuse, randomVectorSpecular, 0.7f );
 				throughput *= hitpointColor;
 				break;
 
@@ -639,7 +422,7 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 				// ray refracts, instead of bouncing
 				// for now, perfect reflector with small attenuation
 				rayDirection = reflectedVector;
-				throughput *= 0.97;
+				throughput *= 0.97f;
 
 				// flip the sign to invert the lens material distance estimate, because the ray is either entering or leaving a refractive medium
 				// refractState = -1.0 * refractState;
@@ -655,61 +438,61 @@ vec3 colorSample( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 		if ( randomFloat() > maxChannel ) break;
 
 		// russian roulette compensation term
-		throughput *= 1.0 / maxChannel;
+		throughput *= 1.0f / maxChannel;
 	}
 
 	return finalColor;
 }
 
-#define RANDOM
-vec2 getRandomOffset( int n ){
+#define BLUE
+vec2 getRandomOffset ( int n ) {
 	// weyl sequence from http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/ and https://www.shadertoy.com/view/4dtBWH
 	#ifdef UNIFORM
-		return fract( vec2( 0.0f ) + vec2( n * 12664745, n * 9560333 ) / exp2( 24.0 ) );	// integer mul to avoid round-off
+		return fract( vec2( 0.0f ) + vec2( n * 12664745, n * 9560333 ) / exp2( 24.0f ) );	// integer mul to avoid round-off
 	#endif
 	#ifdef UNIFORM2
-		return fract( vec2( 0.0f ) + float( n ) * vec2( 0.754877669, 0.569840296 ) );
+		return fract( vec2( 0.0f ) + float( n ) * vec2( 0.754877669f, 0.569840296f ) );
 	#endif
 	// wang hash random offsets
 	#ifdef RANDOM
 		return vec2( randomFloat(), randomFloat() );
 	#endif
 	#ifdef BLUE
-		return blueNoiseReference().xy;
+		return blueNoiseReference( ivec2( gl_GlobalInvocationID.xy ) ).xy;
 	#endif
 }
 
-void storeNormalAndDepth( vec3 normal, float depth ) {
+void storeNormalAndDepth ( vec3 normal, float depth ) {
 	// blend with history and imageStore
 	vec4 prevResult = imageLoad( accumulatorNormalsAndDepth, location );
-	vec4 blendResult = mix( prevResult, vec4( normal, depth ), 1.0 / sampleCount );
+	vec4 blendResult = mix( prevResult, vec4( normal, depth ), 1.0f / sampleCount );
 	imageStore( accumulatorNormalsAndDepth, location, blendResult );
 }
 
-vec3 pathtraceSample( ivec2 location, int n ) {
-	vec3  cResult = vec3( 0.0 );
-	vec3  nResult = vec3( 0.0 );
-	float dResult = 0.0;
+vec3 pathtraceSample ( ivec2 location, int n ) {
+	vec3  cResult = vec3( 0.0f );
+	vec3  nResult = vec3( 0.0f );
+	float dResult = 0.0f;
 
 #if AA != 1
 	// at AA = 2, this is 4 samples per invocation
 	const float normalizeTerm = float( AA * AA );
-	for( int x = 0; x < AA; x++ ) {
-		for( int y = 0; y < AA; y++ ) {
+	for ( int x = 0; x < AA; x++ ) {
+		for ( int y = 0; y < AA; y++ ) {
 #endif
 
 			// pixel offset + mapped position
 			// vec2 offset = vec2( x + randomFloat(), y + randomFloat() ) / float( AA ) - 0.5; // previous method
 			vec2 offset = getRandomOffset( n );
-			vec2 halfScreenCoord = vec2( imageSize( accumulatorColor ) / 2.0 );
+			vec2 halfScreenCoord = vec2( imageSize( accumulatorColor ) / 2.0f );
 			vec2 mappedPosition = ( vec2( location + offset ) - halfScreenCoord ) / halfScreenCoord;
 
 			// aspect ratio
 			float aspectRatio = float( imageSize( accumulatorColor ).x ) / float( imageSize( accumulatorColor ).y );
 
 			// ray origin + direction
-			vec3 rayDirection = normalize( aspectRatio * mappedPosition.x * basisX + mappedPosition.y * basisY + ( 1.0 / FoV ) * basisZ );
-			vec3 rayOrigin    = viewerPosition + rayDirection * 0.1 * blueNoiseReference( location ).x;
+			vec3 rayDirection = normalize( aspectRatio * mappedPosition.x * basisX + mappedPosition.y * basisY + ( 1.0f / FoV ) * basisZ );
+			vec3 rayOrigin    = viewerPosition + rayDirection * 0.1f * blueNoiseReference( location ).x;
 
 			// thin lens DoF - adjust view vectors to converge at focusDistance
 				// this is a small adjustment to the ray origin and direction - not working correctly - need to revist this
@@ -735,14 +518,14 @@ vec3 pathtraceSample( ivec2 location, int n ) {
 	return cResult * exposure;
 }
 
-void main() {
+void main () {
 	location = ivec2( gl_GlobalInvocationID.xy ) + tileOffset;
 	seed = location.x * 1973 + location.y * 9277 + wangSeed;
 
-	if( !boundsCheck( location ) ) return; // abort on out of bounds
+	if ( !boundsCheck( location ) ) return; // abort on out of bounds
 	vec4 prevResult = imageLoad( accumulatorColor, location );
-	sampleCount = prevResult.a + 1.0;
+	sampleCount = prevResult.a + 1.0f;
 
-	vec3 blendResult = mix( prevResult.rgb, pathtraceSample( location, int( sampleCount ) ), 1.0 / sampleCount );
+	vec3 blendResult = mix( prevResult.rgb, pathtraceSample( location, int( sampleCount ) ), 1.0f / sampleCount );
 	imageStore( accumulatorColor, location, vec4( blendResult, sampleCount ) );
 }
