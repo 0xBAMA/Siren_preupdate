@@ -29,6 +29,15 @@ void engine::raymarch() {
 		// will revisit once the pathtracing logic is implemented
 }
 
+void engine::updateNoiseOffsets () {
+	std::random_device r;
+	std::seed_seq s{ r(), r(), r(), r(), r(), r(), r(), r(), r() };
+	auto gen = std::mt19937_64( s );
+	std::uniform_int_distribution< int > dist( 0, 512 );
+	core.noiseOffset.x = dist( gen );
+	core.noiseOffset.y = dist( gen );
+}
+
 void engine::pathtraceUniformUpdate() {
 
 	glUniform2i( glGetUniformLocation( pathtraceShader, "noiseOffset" ), core.noiseOffset.x, core.noiseOffset.y );
@@ -60,6 +69,9 @@ void engine::pathtraceUniformUpdate() {
 
 void engine::pathtrace() {
 	glUseProgram( pathtraceShader );
+
+	//
+	updateNoiseOffsets();
 
 	// send the uniforms
 	pathtraceUniformUpdate();

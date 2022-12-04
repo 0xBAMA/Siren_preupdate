@@ -37,6 +37,7 @@ private:
 	// main loop functions
 	void mainDisplayBlit();
 	void handleEvents();
+	void updateNoiseOffsets();
 	void pathtraceUniformUpdate();
 	void clear();
 	void imguiPass();
