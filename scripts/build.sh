@@ -3,7 +3,7 @@
 mkdir build
 cmake -S . -B ./build -DCMAKE_BUILD_TYPE=Release
 cd build
-make exe
+make -j17 exe
 cp ./Release/bin/exe ..
 cd ..
 
