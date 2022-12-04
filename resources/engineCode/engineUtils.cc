@@ -14,65 +14,75 @@ void engine::render() {
 	// different rendering modes - preview until pathtrace is triggered
 	glUseProgram( pathtraceShader );
 
-	// 2d blue noise read offset
-	updateNoiseOffsets();
 
-	// send the uniforms
-	pathtraceUniformUpdate();
+	if ( currentMode == renderMode::pathtrace ) {
+		// 2d blue noise read offset
+		updateNoiseOffsets();
 
-	GLuint64 startTime, checkTime;
-	GLuint queryID[ 2 ];
-	glGenQueries( 2, queryID );
-	glQueryCounter( queryID[ 0 ], GL_TIMESTAMP );
+		// send the uniforms
+		pathtraceUniformUpdate();
 
-	// get startTime
-	GLint startTimeAvailable = 0;
-	while( !startTimeAvailable )
-	glGetQueryObjectiv( queryID[ 0 ], GL_QUERY_RESULT_AVAILABLE, &startTimeAvailable );
-	glGetQueryObjectui64v( queryID[ 0 ], GL_QUERY_RESULT, &startTime );
+		GLuint64 startTime, checkTime;
+		GLuint queryID[ 2 ];
+		glGenQueries( 2, queryID );
+		glQueryCounter( queryID[ 0 ], GL_TIMESTAMP );
 
-	// used for the wang hash seeding, as well as the noise offset
-	static std::default_random_engine gen;
-	static std::uniform_int_distribution< int > dist( 0, std::numeric_limits< int >::max() / 4 );
+		// get startTime
+		GLint startTimeAvailable = 0;
+		while( !startTimeAvailable )
+		glGetQueryObjectiv( queryID[ 0 ], GL_QUERY_RESULT_AVAILABLE, &startTimeAvailable );
+		glGetQueryObjectui64v( queryID[ 0 ], GL_QUERY_RESULT, &startTime );
 
-	int tilesCompleted = 0;
-	float looptime = 0.0f;
+		// used for the wang hash seeding, as well as the noise offset
+		static std::default_random_engine gen;
+		static std::uniform_int_distribution< int > dist( 0, std::numeric_limits< int >::max() / 4 );
 
-	while( 1 ) {
-		glm::ivec2 tile = getTile(); // get a tile offset + send it
-		glUniform2i( glGetUniformLocation( pathtraceShader, "tileOffset" ), tile.x, tile.y );
+		int tilesCompleted = 0;
+		float looptime = 0.0f;
 
-		// seeding the wang rng in the shader - shader uses both the screen location and this value
-		int value = dist( gen );
-		// cout << value << endl;
-		glUniform1i( glGetUniformLocation( pathtraceShader, "wangSeed" ), value );
+		while( 1 ) {
+			glm::ivec2 tile = getTile(); // get a tile offset + send it
+			glUniform2i( glGetUniformLocation( pathtraceShader, "tileOffset" ), tile.x, tile.y );
 
-		// render the specified tile - dispatch
-		glDispatchCompute( host.tileSize / 8, host.tileSize / 8, 1 );
-		// glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
-		glMemoryBarrier(  GL_ALL_BARRIER_BITS );
-		tilesCompleted++;
+			// seeding the wang rng in the shader - shader uses both the screen location and this value
+			int value = dist( gen );
+			// cout << value << endl;
+			glUniform1i( glGetUniformLocation( pathtraceShader, "wangSeed" ), value );
 
-		// check time, wait for query to be ready
-		glQueryCounter( queryID[ 1 ], GL_TIMESTAMP );
-		GLint checkTimeAvailable = 0;
-		while( !checkTimeAvailable ) {
-			glGetQueryObjectiv( queryID[ 1 ], GL_QUERY_RESULT_AVAILABLE, &checkTimeAvailable );
+			// render the specified tile - dispatch
+			glDispatchCompute( host.tileSize / 8, host.tileSize / 8, 1 );
+			// glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
+			glMemoryBarrier(  GL_ALL_BARRIER_BITS );
+			tilesCompleted++;
+
+			// check time, wait for query to be ready
+			glQueryCounter( queryID[ 1 ], GL_TIMESTAMP );
+			GLint checkTimeAvailable = 0;
+			while( !checkTimeAvailable ) {
+				glGetQueryObjectiv( queryID[ 1 ], GL_QUERY_RESULT_AVAILABLE, &checkTimeAvailable );
+			}
+			glGetQueryObjectui64v( queryID[ 1 ], GL_QUERY_RESULT, &checkTime );
+
+			// break if duration exceeds 16 ms ( 60fps + a small margin ) - query units are nanoseconds
+			looptime = ( checkTime - startTime ) / 1e6f; // get milliseconds
+			if( looptime > ( 16.0f ) || tilesCompleted >= host.tilePerFrameCap ) {
+				// cout << tilesCompleted << " tiles in " << looptime << " ms, avg " << looptime / tilesCompleted << " ms/tile" << endl;
+				break;
+			}
 		}
-		glGetQueryObjectui64v( queryID[ 1 ], GL_QUERY_RESULT, &checkTime );
+		fpsHistory.push_back( 1000.0f / looptime );
+		fpsHistory.pop_front();
 
-		// break if duration exceeds 16 ms ( 60fps + a small margin ) - query units are nanoseconds
-		looptime = ( checkTime - startTime ) / 1e6f; // get milliseconds
-		if( looptime > ( 16.0f ) || tilesCompleted >= host.tilePerFrameCap ) {
-			// cout << tilesCompleted << " tiles in " << looptime << " ms, avg " << looptime / tilesCompleted << " ms/tile" << endl;
-			break;
-		}
+		tileHistory.push_back( tilesCompleted );
+		tileHistory.pop_front();
+
+	} else if ( currentMode == renderMode::preview && host.rendererRequiresUpdate ) {
+		host.rendererRequiresUpdate = false;
+
+		// quick raymarch, only runs when movement has happened since last render event
+			// don't need to update the history deques, as they will not be displayed
+
 	}
-	fpsHistory.push_back( 1000.0f / looptime );
-	fpsHistory.pop_front();
-
-	tileHistory.push_back( tilesCompleted );
-	tileHistory.pop_front();
 }
 
 void engine::updateNoiseOffsets () {
@@ -171,7 +181,7 @@ void engine::imguiPass() {
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar;
 	ImGui::Begin( "Settings", NULL, flags );
 
-	ImGui::Text(" Parameters ");
+	ImGui::Text( " Parameters " );
 	if ( ImGui::BeginTabBar( "Config Sections", ImGuiTabBarFlags_None ) ) {
 		if ( ImGui::BeginTabItem( " Host " ) ) {
 			ImGui::SliderInt( "Screenshot Width", &host.screenshotDim, 1000, maxTextureSizeCheck );
@@ -197,20 +207,20 @@ void engine::imguiPass() {
 			// core renderer parameters
 			ImGui::SliderInt( "Max Raymarch Steps", &core.maxSteps, 1, 500 );
 			ImGui::SliderInt( "Max Light Bounces", &core.maxBounces, 1, 50 );
-			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0, 200.0 );
-			ImGui::SliderFloat( "Raymarch Understep", &core.understep, 0.1, 1.0 );
-			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001, 0.1, "%.4f" );
+			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0f, 200.0f );
+			ImGui::SliderFloat( "Raymarch Understep", &core.understep, 0.1f, 1.0f );
+			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001f, 0.1f, "%.4f" );
 			ImGui::Separator();
-			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1, 3.6 );
-			// ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0, 200.0 );
-			// ImGui::SliderFloat( "Thin Lens Effect Intensity", &core.thinLensIntensity, 0.0, 5.0 );
+			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1f, 3.6f );
+			// ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0f, 200.0f );
+			// ImGui::SliderFloat( "Thin Lens Effect Intensity", &core.thinLensIntensity, 0.0f, 5.0f );
 			ImGui::Separator();
 			ImGui::SliderInt( "SDF Normal Method", &core.normalMethod, 1, 3 );
-			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01, 2.5 );
+			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01f, 2.5f );
 			ImGui::Separator();
-			ImGui::SliderFloat( "Viewer X", &core.viewerPosition.x, -20.0, 20.0 );
-			ImGui::SliderFloat( "Viewer Y", &core.viewerPosition.y, -20.0, 20.0 );
-			ImGui::SliderFloat( "Viewer Z", &core.viewerPosition.z, -20.0, 20.0 );
+			ImGui::SliderFloat( "Viewer X", &core.viewerPosition.x, -20.0f, 20.0f );
+			ImGui::SliderFloat( "Viewer Y", &core.viewerPosition.y, -20.0f, 20.0f );
+			ImGui::SliderFloat( "Viewer Z", &core.viewerPosition.z, -20.0f, 20.0f );
 
 			// have it tell what the current set of basis vectors is
 
@@ -218,12 +228,12 @@ void engine::imguiPass() {
 		}
 		if ( ImGui::BeginTabItem( " Lens / Model " ) ) {
 			// lens geometry parameters
-			ImGui::SliderFloat( "Lens Scale Factor", &lens.lensScaleFactor, 0.001, 2.5 );
-			ImGui::SliderFloat( "Lens Radius 1", &lens.lensRadius1, 0.01, 10.0 );
-			ImGui::SliderFloat( "Lens Radius 2", &lens.lensRadius2, 0.01, 10.0 );
-			ImGui::SliderFloat( "Lens Thickness", &lens.lensThickness, 0.01, 10.0 );
-			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -35.0, 35.0 );
-			ImGui::SliderFloat( "Lens IOR", &lens.lensIOR, 0.0, 2.0 );
+			ImGui::SliderFloat( "Lens Scale Factor", &lens.lensScaleFactor, 0.001f, 2.5f );
+			ImGui::SliderFloat( "Lens Radius 1", &lens.lensRadius1, 0.01f, 10.0f );
+			ImGui::SliderFloat( "Lens Radius 2", &lens.lensRadius2, 0.01f, 10.0f );
+			ImGui::SliderFloat( "Lens Thickness", &lens.lensThickness, 0.01f, 10.0f );
+			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -35.0f, 35.0f );
+			ImGui::SliderFloat( "Lens IOR", &lens.lensIOR, 0.0f, 2.0f );
 			ImGui::Separator();
 			ImGui::ColorEdit3( "Red Wall Color", ( float * ) &scene.redWallColor, ImGuiColorEditFlags_PickerHueWheel );
 			ImGui::ColorEdit3( "Green Wall Color", ( float * ) &scene.greenWallColor, ImGuiColorEditFlags_PickerHueWheel );
@@ -240,8 +250,8 @@ void engine::imguiPass() {
 			ImGui::SliderInt( "Tonemap Mode", &post.tonemapMode, 0, 8 ); // whatever the range ends up being
 			ImGui::Separator();
 			ImGui::SliderInt( "Depth Fog Mode", &post.depthMode, 0, 8 ); // whatever the range ends up being
-			ImGui::SliderFloat( "Fog Depth Scalar", &post.depthScale, 0.01, 10.0 );
-			ImGui::SliderFloat( "Gamma Correction", &post.gamma, 0.01, 3.0 );
+			ImGui::SliderFloat( "Fog Depth Scalar", &post.depthScale, 0.01f, 10.0f );
+			ImGui::SliderFloat( "Gamma Correction", &post.gamma, 0.01f, 3.0f );
 			ImGui::SliderInt( "Display Type", &post.displayType, 0, 2 );
 
 			ImGui::EndTabItem();
@@ -249,44 +259,46 @@ void engine::imguiPass() {
 		ImGui::EndTabBar();
 	}
 
-	// performance monitoring
-	float tileValues[ host.performanceHistory ] = {};
-	float fpsValues[ host.performanceHistory ] = {};
-	float tileAverage = 0;
-	float fpsAverage = 0;
-	for ( int n = 0; n < host.performanceHistory; n++ ) {
-		tileAverage += tileValues[ n ] = tileHistory[ n ];
-		fpsAverage += fpsValues[ n ] = fpsHistory[ n ];
+	if ( host.currentMode == renderMode::pathtrace ) {
+		// performance monitoring
+		float tileValues[ host.performanceHistory ] = {};
+		float fpsValues[ host.performanceHistory ] = {};
+		float tileAverage = 0;
+		float fpsAverage = 0;
+		for ( int n = 0; n < host.performanceHistory; n++ ) {
+			tileAverage += tileValues[ n ] = tileHistory[ n ];
+			fpsAverage += fpsValues[ n ] = fpsHistory[ n ];
+		}
+		tileAverage /= float( host.performanceHistory );
+		fpsAverage /= float( host.performanceHistory );
+		char tileOverlay[ 100 ];
+		char fpsOverlay[ 45 ];
+
+		const float msPerTile = ( 1000.0f / fpsAverage ) / tileAverage;
+		const float pixelsPerMs = host.tileSize * host.tileSize / ( msPerTile );
+
+		sprintf( tileOverlay, "avg %.2f tiles/update ( %.2f ms / tile, %.2f pixels / ms )", tileAverage, msPerTile, pixelsPerMs );
+		sprintf( fpsOverlay, "avg %.2f fps ( %.2f ms )", fpsAverage, 1000.0f / fpsAverage );
+
+		// absolute positioning within the window
+		ImGui::SetCursorPosY( ImGui::GetWindowSize().y - 215 );
+		ImGui::Text( " Performance Monitor" );
+		ImGui::SameLine();
+		HelpMarker( "Tiles are processed asynchronously to the frame update. This means that an arbitrary number of tiles may be processed in the space between frames, depending on hardware capabilities and the shader complexity, as configured. The program is designed to maintain ~60fps for responsiveness, regardless of what this hardware capability may be ( up to the point where the execution time of a single tile exceeds the total alotted frame time of 16ms )." );
+		ImGui::Separator();
+		ImGui::Text( "  Tile History" );
+		ImGui::SetCursorPosX( 15 );
+
+		// graph of tiles per frame, for the past $host.performanceHistory frames
+		ImGui::PlotLines( " ", tileValues, IM_ARRAYSIZE( tileValues ), 0, tileOverlay, -10.0f, float( host.tilePerFrameCap ) + 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
+		ImGui::Text( "  FPS History" );
+
+		// graph of time per frame, for the last $host.performanceHistory frames
+			// should stay flat (tm) at 60fps, given the structure of the pathtracing function ( abort on t >= 60fps equivalent )
+		ImGui::SetCursorPosX( 15 );
+		ImGui::PlotLines( " ", fpsValues, IM_ARRAYSIZE( fpsValues ), 0, fpsOverlay, -10.0f, 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
+		ImGui::Text( "  Current Sample Count: %d", fullscreenPasses );
 	}
-	tileAverage /= float( host.performanceHistory );
-	fpsAverage /= float( host.performanceHistory );
-	char tileOverlay[ 100 ];
-	char fpsOverlay[ 45 ];
-
-	const float msPerTile = ( 1000.0f / fpsAverage ) / tileAverage;
-	const float pixelsPerMs = host.tileSize * host.tileSize / ( msPerTile );
-
-	sprintf( tileOverlay, "avg %.2f tiles/update ( %.2f ms / tile, %.2f pixels / ms )", tileAverage, msPerTile, pixelsPerMs );
-	sprintf( fpsOverlay, "avg %.2f fps ( %.2f ms )", fpsAverage, 1000.0f / fpsAverage );
-
-	// absolute positioning within the window
-	ImGui::SetCursorPosY( ImGui::GetWindowSize().y - 215 );
-	ImGui::Text(" Performance Monitor");
-	ImGui::SameLine();
-	HelpMarker("Tiles are processed asynchronously to the frame update. This means that an arbitrary number of tiles may be processed in the space between frames, depending on hardware capabilities and the shader complexity, as configured. The program is designed to maintain ~60fps for responsiveness, regardless of what this hardware capability may be ( up to the point where the execution time of a single tile exceeds the total alotted frame time of 16ms ).");
-	ImGui::Separator();
-	ImGui::Text("  Tile History");
-	ImGui::SetCursorPosX( 15 );
-
-	// graph of tiles per frame, for the past $host.performanceHistory frames
-	ImGui::PlotLines( " ", tileValues, IM_ARRAYSIZE( tileValues ), 0, tileOverlay, -10.0f, float( host.tilePerFrameCap ) + 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
-	ImGui::Text("  FPS History");
-
-	// graph of time per frame, for the last $host.performanceHistory frames
-		// should stay flat (tm) at 60fps, given the structure of the pathtracing function ( abort on t >= 60fps equivalent )
-	ImGui::SetCursorPosX( 15 );
-	ImGui::PlotLines( " ", fpsValues, IM_ARRAYSIZE( fpsValues ), 0, fpsOverlay, -10.0f, 200.0f, ImVec2( ImGui::GetWindowSize().x - 30, 65 ) );
-	ImGui::Text("  Current Sample Count: %d", fullscreenPasses );
 
 	// finished with the settings window
 	ImGui::End();
@@ -319,6 +331,7 @@ void engine::handleEvents() {
 
 		if ( event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_r ) {
 			resetAccumulators();
+			rendererRequiresUpdate = true;
 		}
 
 		// quaternion based rotation via retained state in the basis vectors - much easier to use than the arbitrary euler angles
@@ -326,31 +339,37 @@ void engine::handleEvents() {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisX ); // basisX is the axis, therefore remains untransformed
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisX );
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_a ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisY ); // same as above, but basisY is the axis
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_d ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisY );
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
 			core.basisZ = ( rot * glm::vec4( core.basisZ, 0.0f ) ).xyz();
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ? -0.1f : -0.005f, core.basisZ ); // and again for basisZ
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e ) {
 			glm::quat rot = glm::angleAxis( SDL_GetModState() & KMOD_SHIFT ?  0.1f :  0.005f, core.basisZ );
 			core.basisX = ( rot * glm::vec4( core.basisX, 0.0f ) ).xyz();
 			core.basisY = ( rot * glm::vec4( core.basisY, 0.0f ) ).xyz();
+			rendererRequiresUpdate = true;
 		}
 
 		// f to reset basis, shift + f to reset basis and home to origin
@@ -362,25 +381,32 @@ void engine::handleEvents() {
 			core.basisX = glm::vec3( 1.0f, 0.0f, 0.0f );
 			core.basisY = glm::vec3( 0.0f, 1.0f, 0.0f );
 			core.basisZ = glm::vec3( 0.0f, 0.0f, 1.0f );
+			rendererRequiresUpdate = true;
 		}
 
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_UP ) {
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisZ;
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_DOWN ) {
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisZ;
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RIGHT ) {
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisX;
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_LEFT ) {
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisX;
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEUP ) {
 			core.viewerPosition += ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisY;
+			rendererRequiresUpdate = true;
 		}
 		if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_PAGEDOWN ) {
 			core.viewerPosition -= ( SDL_GetModState() & KMOD_SHIFT ? 0.07f : 0.005f ) * core.basisY;
+			rendererRequiresUpdate = true;
 		}
 	}
 }

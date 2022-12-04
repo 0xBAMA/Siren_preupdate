@@ -99,7 +99,7 @@ using json = nlohmann::json;
 
 enum class renderMode { none, preview, pathtrace };
 struct hostParameters {
-	bool movementSinceUpdate = true;				// has the viewer moved since the screen has updated?
+	bool rendererRequiresUpdate = true;				// has the viewer moved since the screen has updated?
 	renderMode currentMode = renderMode::preview;	// how should we render the scene?
 	int performanceHistory = 250;					// how many datapoints to keep for tile count / fps
 
