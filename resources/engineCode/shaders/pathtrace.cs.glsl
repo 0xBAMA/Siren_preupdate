@@ -30,9 +30,10 @@ uniform int		modeSelect;			// do we do a pathtrace sample, or just the preview
 
 // render modes
 #define PATHTRACE		0
-#define PREVIEW_COLOR	1
+#define PREVIEW_DIFFUSE	1
 #define PREVIEW_NORMAL	2
 #define PREVIEW_DEPTH	3
+#define PREVIEW_SHADED	4
 
 // lens parameters
 uniform float lensScaleFactor;		// scales the lens DE
@@ -365,29 +366,31 @@ float raymarch ( vec3 origin, vec3 direction ) {
 
 ivec2 location = ivec2( 0, 0 );	// 2d location, pixel coords
 vec3 colorSample ( vec3 rayOrigin_in, vec3 rayDirection_in ) {
-	// debug output
-	if ( modeSelect != PATHTRACE ) {
-		const float rayDistance = raymarch( rayOrigin_in, rayDirection_in );
-		const vec3 pHit = rayOrigin_in + rayDistance * rayDirection_in;
-		const vec3 hitpointNormal = normal( pHit );
-		const vec3 hitpointDepth = vec3( 1.0f / rayDistance );
-		if ( de( pHit ) < epsilon ) {
-			switch ( modeSelect ) {
-				case PREVIEW_COLOR:		return hitpointColor;
-				case PREVIEW_NORMAL:	return hitpointNormal;
-				case PREVIEW_DEPTH:		return hitpointDepth;
-			}
-		} else {
-			return vec3( 0.0f );
-		}
-	}
 
 	vec3 rayOrigin = rayOrigin_in, previousRayOrigin;
 	vec3 rayDirection = rayDirection_in, previousRayDirection;
 	vec3 finalColor = vec3( 0.0f );
 	vec3 throughput = vec3( 1.0f );
 
-	rayOrigin += rayDirection;
+	// bump origin up by unit vector - creates section plane
+	rayOrigin += rayDirection * ( 0.9f + 0.1f * blueNoiseReference( location ).x );
+
+	// debug output
+	if ( modeSelect != PATHTRACE ) {
+		const float rayDistance = raymarch( rayOrigin, rayDirection );
+		const vec3 pHit = rayOrigin + rayDistance * rayDirection;
+		const vec3 hitpointNormal = normal( pHit );
+		const vec3 hitpointDepth = vec3( 1.0f / rayDistance );
+		if ( de( pHit ) < epsilon ) {
+			switch ( modeSelect ) {
+				case PREVIEW_DIFFUSE: return hitpointColor; break;
+				case PREVIEW_NORMAL: return hitpointNormal; break;
+				case PREVIEW_DEPTH: return hitpointDepth; break;
+			}
+		} else {
+			return vec3( 0.0f );
+		}
+	}
 
 	// loop to max bounces
 	for( int bounce = 0; bounce < maxBounces; bounce++ ) {
@@ -474,12 +477,12 @@ vec2 getRandomOffset ( int n ) {
 	#endif
 }
 
-void storeNormalAndDepth ( vec3 normal, float depth ) {
-	// blend with history and imageStore
-	vec4 prevResult = imageLoad( accumulatorNormalsAndDepth, location );
-	vec4 blendResult = mix( prevResult, vec4( normal, depth ), 1.0f / sampleCount );
-	imageStore( accumulatorNormalsAndDepth, location, blendResult );
-}
+// void storeNormalAndDepth ( vec3 normal, float depth ) {
+// 	// blend with history and imageStore
+// 	vec4 prevResult = imageLoad( accumulatorNormalsAndDepth, location );
+// 	vec4 blendResult = mix( prevResult, vec4( normal, depth ), 1.0f / sampleCount );
+// 	imageStore( accumulatorNormalsAndDepth, location, blendResult );
+// }
 
 vec3 pathtraceSample ( ivec2 location, int n ) {
 	vec3  cResult = vec3( 0.0f );
@@ -504,7 +507,7 @@ vec3 pathtraceSample ( ivec2 location, int n ) {
 
 			// ray origin + direction
 			vec3 rayDirection = normalize( aspectRatio * mappedPosition.x * basisX + mappedPosition.y * basisY + ( 1.0f / FoV ) * basisZ );
-			vec3 rayOrigin    = viewerPosition + rayDirection * 0.1f * blueNoiseReference( location ).x;
+			vec3 rayOrigin    = viewerPosition;
 
 			// thin lens DoF - adjust view vectors to converge at focusDistance
 				// this is a small adjustment to the ray origin and direction - not working correctly - need to revist this
@@ -514,8 +517,8 @@ vec3 pathtraceSample ( ivec2 location, int n ) {
 			// rayDirection = normalize( focuspoint - rayOrigin );
 
 			// get depth and normals - think about special handling for refractive hits
-			float distanceToFirstHit = raymarch( rayOrigin, rayDirection );
-			storeNormalAndDepth( normal( rayOrigin + distanceToFirstHit * rayDirection ), distanceToFirstHit );
+			// float distanceToFirstHit = raymarch( rayOrigin, rayDirection );
+			// storeNormalAndDepth( normal( rayOrigin + distanceToFirstHit * rayDirection ), distanceToFirstHit );
 
 			// get the result for a ray
 			cResult += colorSample( rayOrigin, rayDirection );
@@ -543,11 +546,11 @@ void main () {
 			imageStore( accumulatorColor, location, vec4( blendResult, sampleCount ) );
 			break;
 
-		case PREVIEW_COLOR:
+		case PREVIEW_DIFFUSE:
 		case PREVIEW_NORMAL:
 		case PREVIEW_DEPTH:
 			location = ivec2( gl_GlobalInvocationID.xy );
-			imageStore( accumulatorColor, location, vec4( pathtraceSample( location, 1 ), 1.0f ) );
+			imageStore( accumulatorColor, location, vec4( pathtraceSample( location, 0 ), 1.0f ) );
 			break;
 
 		default:

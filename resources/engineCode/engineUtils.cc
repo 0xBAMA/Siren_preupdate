@@ -28,8 +28,22 @@ void engine::render() {
 	int value = dist( gen );
 	glUniform1i( glGetUniformLocation( pathtraceShader, "wangSeed" ), value );
 
+	int mode = 0;
+	switch ( host.currentMode ) {
+		case renderMode::previewColor:	mode = 1; break;
+		case renderMode::previewNormal:	mode = 2; break;
+		case renderMode::previewDepth:	mode = 3; break;
+		default: break;
+	}
+	glUniform1i( glGetUniformLocation( pathtraceShader, "modeSelect" ), mode );
+
 	// pathtrace happens in tiles
 	if ( host.currentMode == renderMode::pathtrace ) {
+
+		if ( host.rendererRequiresUpdate == true ) {
+			host.rendererRequiresUpdate = false;
+			resetAccumulators();
+		}
 
 		GLuint64 startTime, checkTime;
 		GLuint queryID[ 2 ];
@@ -78,18 +92,11 @@ void engine::render() {
 
 	// preview happens in a one shot fullscreen pass
 	} else if ( host.currentMode != renderMode::pathtrace && host.rendererRequiresUpdate == true ) {
-		host.rendererRequiresUpdate = false; // don't run again
+		host.rendererRequiresUpdate = false; // don't run again till state changes
 
 		// quick raymarch, only runs when movement has happened since last render event
 			// don't need to update the history deques, as they will not be displayed
-		int mode = 0;
-		switch ( host.currentMode ) {
-			case renderMode::previewColor:	mode = 1;
-			case renderMode::previewNormal:	mode = 2;
-			case renderMode::previewDepth:	mode = 3;
-			default: break;
-		}
-		glUniform1i( glGetUniformLocation( pathtraceShader, "modeSelect" ), mode );
+
 
 		// run for every pixel on the screen
 		glDispatchCompute( ( WIDTH + 15 ) / 16, ( HEIGHT + 15 ) / 16, 1 );
@@ -179,11 +186,13 @@ void engine::resetAccumulators () {
 }
 
 void engine::imguiPass () {
+#define UPDATECHECK host.rendererRequiresUpdate=host.rendererRequiresUpdate||ImGui::IsItemEdited()
+
 	// start the imgui frame
 	imguiFrameStart();
 
 	// show the demo window
-	static bool showDemoWindow = !true;
+	static bool showDemoWindow = false;
 	if ( showDemoWindow ) {
 		ImGui::ShowDemoWindow( &showDemoWindow );
 	}
@@ -203,6 +212,27 @@ void engine::imguiPass () {
 			ImGui::Separator();
 			ImGui::SliderInt( "Tile Per Frame Cap", &host.tilePerFrameCap, 1, 3000 );
 
+			static int pickt = 1;
+			static int picktPrev = pickt;
+			ImGui::RadioButton( "Preview Color", &pickt, 1 );
+			ImGui::SameLine();
+			ImGui::RadioButton( "Preview Normal", &pickt, 2 );
+			ImGui::SameLine();
+			ImGui::RadioButton( "Preview Depth", &pickt, 3 );
+			ImGui::SameLine();
+			ImGui::RadioButton( "Pathtrace", &pickt, 0 );
+			switch ( pickt ) {
+				case 0: host.currentMode = renderMode::pathtrace; break;
+				case 1: host.currentMode = renderMode::previewColor; break;
+				case 2: host.currentMode = renderMode::previewNormal; break;
+				case 3: host.currentMode = renderMode::previewDepth; break;
+				default: break;
+			}
+			if ( picktPrev != pickt ) {
+				picktPrev = pickt;
+				host.rendererRequiresUpdate = true;
+			}
+
 			if( ImGui::SmallButton( "Framebuffer Screenshot" ) ) {
 				basicScreenShot();
 			}
@@ -219,22 +249,22 @@ void engine::imguiPass () {
 		}
 		if ( ImGui::BeginTabItem( " Core " ) ) {
 			// core renderer parameters
-			ImGui::SliderInt( "Max Raymarch Steps", &core.maxSteps, 1, 500 );
+			ImGui::SliderInt( "Max Raymarch Steps", &core.maxSteps, 1, 500 ); UPDATECHECK;
 			ImGui::SliderInt( "Max Light Bounces", &core.maxBounces, 1, 50 );
-			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0f, 200.0f );
+			ImGui::SliderFloat( "Max Raymarch Distance", &core.maxDistance, 0.0f, 200.0f ); UPDATECHECK;
 			ImGui::SliderFloat( "Raymarch Understep", &core.understep, 0.1f, 1.0f );
-			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001f, 0.1f, "%.4f" );
+			ImGui::SliderFloat( "Raymarch Epsilon", &core.epsilon, 0.0001f, 0.1f, "%.4f" ); UPDATECHECK;
 			ImGui::Separator();
-			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1f, 3.6f );
+			ImGui::SliderFloat( "Exposure", &core.exposure, 0.1f, 3.6f ); UPDATECHECK;
 			// ImGui::SliderFloat( "Thin Lens Focus Distance", &core.focusDistance, 0.0f, 200.0f );
 			// ImGui::SliderFloat( "Thin Lens Effect Intensity", &core.thinLensIntensity, 0.0f, 5.0f );
 			ImGui::Separator();
-			ImGui::SliderInt( "SDF Normal Method", &core.normalMethod, 1, 3 );
-			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01f, 2.5f );
+			ImGui::SliderInt( "SDF Normal Method", &core.normalMethod, 1, 3 ); UPDATECHECK;
+			ImGui::SliderFloat( "Field of View", &core.FoV, 0.01f, 2.5f ); UPDATECHECK;
 			ImGui::Separator();
-			ImGui::SliderFloat( "Viewer X", &core.viewerPosition.x, -20.0f, 20.0f );
-			ImGui::SliderFloat( "Viewer Y", &core.viewerPosition.y, -20.0f, 20.0f );
-			ImGui::SliderFloat( "Viewer Z", &core.viewerPosition.z, -20.0f, 20.0f );
+			ImGui::SliderFloat( "Viewer X", &core.viewerPosition.x, -20.0f, 20.0f ); UPDATECHECK;
+			ImGui::SliderFloat( "Viewer Y", &core.viewerPosition.y, -20.0f, 20.0f ); UPDATECHECK;
+			ImGui::SliderFloat( "Viewer Z", &core.viewerPosition.z, -20.0f, 20.0f ); UPDATECHECK;
 
 			// have it tell what the current set of basis vectors is
 
@@ -242,16 +272,16 @@ void engine::imguiPass () {
 		}
 		if ( ImGui::BeginTabItem( " Lens / Model " ) ) {
 			// lens geometry parameters
-			ImGui::SliderFloat( "Lens Scale Factor", &lens.lensScaleFactor, 0.001f, 2.5f );
-			ImGui::SliderFloat( "Lens Radius 1", &lens.lensRadius1, 0.01f, 10.0f );
-			ImGui::SliderFloat( "Lens Radius 2", &lens.lensRadius2, 0.01f, 10.0f );
-			ImGui::SliderFloat( "Lens Thickness", &lens.lensThickness, 0.01f, 10.0f );
-			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -35.0f, 35.0f );
+			ImGui::SliderFloat( "Lens Scale Factor", &lens.lensScaleFactor, 0.001f, 2.5f ); UPDATECHECK;
+			ImGui::SliderFloat( "Lens Radius 1", &lens.lensRadius1, 0.01f, 10.0f ); UPDATECHECK;
+			ImGui::SliderFloat( "Lens Radius 2", &lens.lensRadius2, 0.01f, 10.0f ); UPDATECHECK;
+			ImGui::SliderFloat( "Lens Thickness", &lens.lensThickness, 0.01f, 10.0f ); UPDATECHECK;
+			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -35.0f, 35.0f ); UPDATECHECK;
 			ImGui::SliderFloat( "Lens IOR", &lens.lensIOR, 0.0f, 2.0f );
 			ImGui::Separator();
-			ImGui::ColorEdit3( "Red Wall Color", ( float * ) &scene.redWallColor, ImGuiColorEditFlags_PickerHueWheel );
-			ImGui::ColorEdit3( "Green Wall Color", ( float * ) &scene.greenWallColor, ImGuiColorEditFlags_PickerHueWheel );
-			ImGui::ColorEdit3( "Metallic Diffuse", ( float * ) &scene.metallicDiffuse, ImGuiColorEditFlags_PickerHueWheel );
+			ImGui::ColorEdit3( "Red Wall Color", ( float * ) &scene.redWallColor, ImGuiColorEditFlags_PickerHueWheel ); UPDATECHECK;
+			ImGui::ColorEdit3( "Green Wall Color", ( float * ) &scene.greenWallColor, ImGuiColorEditFlags_PickerHueWheel ); UPDATECHECK;
+			ImGui::ColorEdit3( "Metallic Diffuse", ( float * ) &scene.metallicDiffuse, ImGuiColorEditFlags_PickerHueWheel ); UPDATECHECK;
 			ImGui::Separator();
 			ImGui::EndTabItem();
 		}
