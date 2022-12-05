@@ -14,12 +14,22 @@ void engine::render() {
 	// different rendering modes - preview until pathtrace is triggered
 	glUseProgram( pathtraceShader );
 
-	if ( host.currentMode == renderMode::pathtrace ) {
-		// 2d blue noise read offset
-		updateNoiseOffsets();
+	// 2d blue noise read offset
+	updateNoiseOffsets();
 
-		// send the uniforms
-		pathtraceUniformUpdate();
+	// send the uniforms
+	pathtraceUniformUpdate();
+
+	// used for the wang hash seeding
+	static std::default_random_engine gen;
+	static std::uniform_int_distribution< int > dist( 0, std::numeric_limits< int >::max() / 4 );
+
+	// seeding the wang rng in the shader - shader uses both the screen location and this value
+	int value = dist( gen );
+	glUniform1i( glGetUniformLocation( pathtraceShader, "wangSeed" ), value );
+
+	// pathtrace happens in tiles
+	if ( host.currentMode == renderMode::pathtrace ) {
 
 		GLuint64 startTime, checkTime;
 		GLuint queryID[ 2 ];
@@ -32,39 +42,30 @@ void engine::render() {
 		glGetQueryObjectiv( queryID[ 0 ], GL_QUERY_RESULT_AVAILABLE, &startTimeAvailable );
 		glGetQueryObjectui64v( queryID[ 0 ], GL_QUERY_RESULT, &startTime );
 
-		// used for the wang hash seeding, as well as the noise offset
-		static std::default_random_engine gen;
-		static std::uniform_int_distribution< int > dist( 0, std::numeric_limits< int >::max() / 4 );
-
 		int tilesCompleted = 0;
 		float looptime = 0.0f;
 
-		while( 1 ) {
+		while ( 1 ) {
 			glm::ivec2 tile = getTile(); // get a tile offset + send it
 			glUniform2i( glGetUniformLocation( pathtraceShader, "tileOffset" ), tile.x, tile.y );
 
-			// seeding the wang rng in the shader - shader uses both the screen location and this value
-			int value = dist( gen );
-			// cout << value << endl;
-			glUniform1i( glGetUniformLocation( pathtraceShader, "wangSeed" ), value );
-
 			// render the specified tile - dispatch
-			glDispatchCompute( host.tileSize / 8, host.tileSize / 8, 1 );
+			glDispatchCompute( host.tileSize / 16, host.tileSize / 16, 1 );
 			// glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
-			glMemoryBarrier(  GL_ALL_BARRIER_BITS );
+			glMemoryBarrier( GL_ALL_BARRIER_BITS );
 			tilesCompleted++;
 
 			// check time, wait for query to be ready
 			glQueryCounter( queryID[ 1 ], GL_TIMESTAMP );
 			GLint checkTimeAvailable = 0;
-			while( !checkTimeAvailable ) {
+			while ( !checkTimeAvailable ) {
 				glGetQueryObjectiv( queryID[ 1 ], GL_QUERY_RESULT_AVAILABLE, &checkTimeAvailable );
 			}
 			glGetQueryObjectui64v( queryID[ 1 ], GL_QUERY_RESULT, &checkTime );
 
 			// break if duration exceeds 16 ms ( 60fps + a small margin ) - query units are nanoseconds
 			looptime = ( checkTime - startTime ) / 1e6f; // get milliseconds
-			if( looptime > ( 16.0f ) || tilesCompleted >= host.tilePerFrameCap ) {
+			if ( looptime > ( 16.0f ) || tilesCompleted >= host.tilePerFrameCap ) {
 				// cout << tilesCompleted << " tiles in " << looptime << " ms, avg " << looptime / tilesCompleted << " ms/tile" << endl;
 				break;
 			}
@@ -75,12 +76,24 @@ void engine::render() {
 		tileHistory.push_back( tilesCompleted );
 		tileHistory.pop_front();
 
-	} else if ( host.currentMode == renderMode::preview && host.rendererRequiresUpdate == true ) {
-		host.rendererRequiresUpdate = false;
+	// preview happens in a one shot fullscreen pass
+	} else if ( host.currentMode != renderMode::pathtrace && host.rendererRequiresUpdate == true ) {
+		host.rendererRequiresUpdate = false; // don't run again
 
 		// quick raymarch, only runs when movement has happened since last render event
 			// don't need to update the history deques, as they will not be displayed
+		int mode = 0;
+		switch ( host.currentMode ) {
+			case renderMode::previewColor:	mode = 1;
+			case renderMode::previewNormal:	mode = 2;
+			case renderMode::previewDepth:	mode = 3;
+			default: break;
+		}
+		glUniform1i( glGetUniformLocation( pathtraceShader, "modeSelect" ), mode );
 
+		// run for every pixel on the screen
+		glDispatchCompute( ( WIDTH + 15 ) / 16, ( HEIGHT + 15 ) / 16, 1 );
+		glMemoryBarrier( GL_ALL_BARRIER_BITS );
 	}
 }
 
@@ -124,7 +137,7 @@ void engine::pathtraceUniformUpdate() {
 	glUniform3f( glGetUniformLocation( pathtraceShader, "metallicDiffuse" ), scene.metallicDiffuse.x, scene.metallicDiffuse.y, scene.metallicDiffuse.z );
 }
 
-void engine::postprocess() {
+void engine::postprocess () {
 	// tonemapping and dithering, as configured in the GUI
 	glUseProgram( postprocessShader );
 
@@ -134,7 +147,7 @@ void engine::postprocess() {
 	glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT ); // sync
 }
 
-void engine::mainDisplayBlit() {
+void engine::mainDisplayBlit () {
 	// clear the screen
 	glClearColor( clearColor.x, clearColor.y, clearColor.z, clearColor.w );
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
@@ -148,7 +161,7 @@ void engine::mainDisplayBlit() {
 	glDrawArrays( GL_TRIANGLES, 0, 3 );
 }
 
-void engine::resetAccumulators() {
+void engine::resetAccumulators () {
 	std::vector< unsigned char > imageData;
 	imageData.resize( WIDTH * HEIGHT * 4, 0 );
 	// reset color accumulator
@@ -165,7 +178,7 @@ void engine::resetAccumulators() {
 	cout << "Accumulator Buffer has been reinitialized" << endl;
 }
 
-void engine::imguiPass() {
+void engine::imguiPass () {
 	// start the imgui frame
 	imguiFrameStart();
 
@@ -254,7 +267,6 @@ void engine::imguiPass() {
 			ImGui::SliderFloat( "Fog Depth Scalar", &post.depthScale, 0.01f, 10.0f );
 			ImGui::SliderFloat( "Gamma Correction", &post.gamma, 0.01f, 3.0f );
 			ImGui::SliderInt( "Display Type", &post.displayType, 0, 2 );
-
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();
@@ -491,7 +503,7 @@ void engine::basicScreenShot() {
 
 	unsigned error;
 	if ( ( error = lodepng::encode( filename.c_str(), outputBytes, WIDTH, HEIGHT ) ) ) {
-		std::cout << "encode error during save(\" " + filename + " \") " << error << ": " << lodepng_error_text( error ) << std::endl;
+		std::cout << "encode error during save( \"" + filename + "\" ) " << error << ": " << lodepng_error_text( error ) << std::endl;
 	}
 }
 
@@ -505,11 +517,11 @@ void engine::offlineScreenShot() {
 
 	// set to max of screenshotDim and maximum value
 	// host.screenshotDim = std::min( maxTextureSize, host.screenshotDim );
-	//
+
 	// cout << "Capturing at " << host.screenshotDim << " by " << static_cast< int > ( host.screenshotDim * ( float( HEIGHT ) / float( WIDTH ) ) ) << std::endl;
 
 	// create the texture, same aspect ratio as preview texture, but with the larger dimensions
 	// this is going to be configured in the menus and kept in the config structs
-	// render the image into the
+	// render the image into another image target that's kept on the GPU
 
 }

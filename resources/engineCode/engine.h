@@ -51,9 +51,9 @@ private:
 	void offlineScreenShot();	// render out with prescribed sample count + resolution
 
 	// rendering functions
-	void render(); 			// swichable functionality
-	void postprocess();		// tonemap, dither
-	glm::ivec2 getTile();	// tile renderer offset
+	void render(); 				// swichable functionality
+	void postprocess();			// tonemap, dither
+	glm::ivec2 getTile();		// tile renderer offset
 
 	// shutdown procedures
 	void imguiQuit();

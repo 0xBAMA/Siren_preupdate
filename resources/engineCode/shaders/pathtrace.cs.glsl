@@ -1,5 +1,5 @@
 #version 430 core
-layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+layout( local_size_x = 16, local_size_y = 16, local_size_z = 1 ) in;
 
 layout( binding = 1, rgba32f ) uniform image2D accumulatorColor;
 layout( binding = 2, rgba32f ) uniform image2D accumulatorNormalsAndDepth;
@@ -26,6 +26,13 @@ uniform vec3	basisX;				// x basis vector
 uniform vec3	basisY;				// y basis vector
 uniform vec3	basisZ;				// z basis vector
 uniform int		wangSeed;			// integer value used for seeding the wang hash rng
+uniform int		modeSelect;			// do we do a pathtrace sample, or just the preview
+
+// render modes
+#define PATHTRACE		0
+#define PREVIEW_COLOR	1
+#define PREVIEW_NORMAL	2
+#define PREVIEW_DEPTH	3
 
 // lens parameters
 uniform float lensScaleFactor;		// scales the lens DE
@@ -358,17 +365,22 @@ float raymarch ( vec3 origin, vec3 direction ) {
 
 ivec2 location = ivec2( 0, 0 );	// 2d location, pixel coords
 vec3 colorSample ( vec3 rayOrigin_in, vec3 rayDirection_in ) {
-
-	// // #define DEBUG
-	// #ifdef DEBUG
-	// // debug output for testing
-	// 	float rayDistance = raymarch( rayOrigin_in, rayDirection_in );
-	// 	vec3 pHit = rayOrigin_in + rayDistance * rayDirection_in;
-	// 	if( de( rayOrigin_in + rayDistance * rayDirection_in ) < epsilon )
-	// 		return hitpointColor;
-	// 	else
-	// 		return vec3( 0.0 );
-	// #endif
+	// debug output
+	if ( modeSelect != PATHTRACE ) {
+		const float rayDistance = raymarch( rayOrigin_in, rayDirection_in );
+		const vec3 pHit = rayOrigin_in + rayDistance * rayDirection_in;
+		const vec3 hitpointNormal = normal( pHit );
+		const vec3 hitpointDepth = vec3( 1.0f / rayDistance );
+		if ( de( pHit ) < epsilon ) {
+			switch ( modeSelect ) {
+				case PREVIEW_COLOR:		return hitpointColor;
+				case PREVIEW_NORMAL:	return hitpointNormal;
+				case PREVIEW_DEPTH:		return hitpointDepth;
+			}
+		} else {
+			return vec3( 0.0f );
+		}
+	}
 
 	vec3 rayOrigin = rayOrigin_in, previousRayOrigin;
 	vec3 rayDirection = rayDirection_in, previousRayDirection;
@@ -511,10 +523,10 @@ vec3 pathtraceSample ( ivec2 location, int n ) {
 #if AA != 1
 		}
 	}
-	return ( cResult / normalizeTerm ) * exposure;
+	// multisample compensation req'd
+	cResult /= normalizeTerm;
 #endif
 
-	// no multisample compensation req'd
 	return cResult * exposure;
 }
 
@@ -522,10 +534,24 @@ void main () {
 	location = ivec2( gl_GlobalInvocationID.xy ) + tileOffset;
 	seed = location.x * 1973 + location.y * 9277 + wangSeed;
 
-	if ( !boundsCheck( location ) ) return; // abort on out of bounds
-	vec4 prevResult = imageLoad( accumulatorColor, location );
-	sampleCount = prevResult.a + 1.0f;
+	switch ( modeSelect ) {
+		case PATHTRACE:
+			if ( !boundsCheck( location ) ) return; // abort on out of bounds
+			vec4 prevResult = imageLoad( accumulatorColor, location );
+			sampleCount = prevResult.a + 1.0f;
+			vec3 blendResult = mix( prevResult.rgb, pathtraceSample( location, int( sampleCount ) ), 1.0f / sampleCount );
+			imageStore( accumulatorColor, location, vec4( blendResult, sampleCount ) );
+			break;
 
-	vec3 blendResult = mix( prevResult.rgb, pathtraceSample( location, int( sampleCount ) ), 1.0f / sampleCount );
-	imageStore( accumulatorColor, location, vec4( blendResult, sampleCount ) );
+		case PREVIEW_COLOR:
+		case PREVIEW_NORMAL:
+		case PREVIEW_DEPTH:
+			location = ivec2( gl_GlobalInvocationID.xy );
+			imageStore( accumulatorColor, location, vec4( pathtraceSample( location, 1 ), 1.0f ) );
+			break;
+
+		default:
+			return;
+			break;
+	}
 }

@@ -97,10 +97,10 @@ using json = nlohmann::json;
 // #define WIDTH  1920 * 2			// width of the texture that the tiles render to
 // #define HEIGHT 1080 * 2			// height of the texture that the tiles render to
 
-enum class renderMode { none, preview, pathtrace };
+enum class renderMode { previewColor, previewNormal, previewDepth, pathtrace };
 struct hostParameters {
 	bool rendererRequiresUpdate = true;				// has the viewer moved since the screen has updated?
-	renderMode currentMode = renderMode::preview;	// how should we render the scene?
+	renderMode currentMode = renderMode::previewNormal;	// how should we render the scene?
 	int performanceHistory = 250;					// how many datapoints to keep for tile count / fps
 	int fullscreenPasses = 0;						// how many times have we exhausted the tile vector
 
