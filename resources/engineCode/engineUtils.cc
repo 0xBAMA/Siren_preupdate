@@ -165,7 +165,7 @@ void engine::postprocess () {
 	// send associated uniforms
 	postprocessUniformUpdate();
 
-	glDispatchCompute( std::ceil( WIDTH / 32 ), std::ceil( HEIGHT / 32 ), 1 );
+	glDispatchCompute( ( WIDTH + 31 ) / 32, ( HEIGHT + 31 ) / 32, 1 );
 	glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT ); // sync
 }
 
@@ -228,24 +228,19 @@ void engine::imguiPass () {
 			ImGui::SliderInt( "Tile Per Frame Cap", &host.tilePerFrameCap, 1, 3000 );
 
 			static int pickt = 1;
-			static int picktPrev = pickt;
-			ImGui::RadioButton( "Preview Color", &pickt, 1 );
+			ImGui::RadioButton( "Preview Color", &pickt, 1 ); UPDATECHECK;
 			ImGui::SameLine();
-			ImGui::RadioButton( "Preview Normal", &pickt, 2 );
+			ImGui::RadioButton( "Preview Normal", &pickt, 2 ); UPDATECHECK;
 			ImGui::SameLine();
-			ImGui::RadioButton( "Preview Depth", &pickt, 3 );
+			ImGui::RadioButton( "Preview Depth", &pickt, 3 ); UPDATECHECK;
 			ImGui::SameLine();
-			ImGui::RadioButton( "Pathtrace", &pickt, 0 );
+			ImGui::RadioButton( "Pathtrace", &pickt, 0 ); UPDATECHECK;
 			switch ( pickt ) {
 				case 0: host.currentMode = renderMode::pathtrace; break;
 				case 1: host.currentMode = renderMode::previewColor; break;
 				case 2: host.currentMode = renderMode::previewNormal; break;
 				case 3: host.currentMode = renderMode::previewDepth; break;
 				default: break;
-			}
-			if ( picktPrev != pickt ) {
-				picktPrev = pickt;
-				host.rendererRequiresUpdate = true;
 			}
 
 			if( ImGui::SmallButton( "Framebuffer Screenshot" ) ) {
@@ -471,16 +466,16 @@ void engine::handleEvents() {
 	}
 }
 
-glm::ivec2 engine::getTile() {
+glm::ivec2 engine::getTile () {
 	static std::vector< glm::ivec2 > offsets;
 	static int listOffset = 0;
 	std::random_device rd;
 	std::mt19937 rngen( rd() );
 
-	if ( host.tileSizeUpdated ) { // construct the tile list ( runs at frame 0 and again any time the value changes )
+	if ( host.tileSizeUpdated == true ) { // construct the tile list ( runs at frame 0 and again any time the value changes )
 		host.tileSizeUpdated = false;
-		for( int x = 0; x <= WIDTH; x += host.tileSize ) {
-			for( int y = 0; y <= HEIGHT; y += host.tileSize ) {
+		for ( int x = 0; x <= WIDTH; x += host.tileSize ) {
+			for ( int y = 0; y <= HEIGHT; y += host.tileSize ) {
 				offsets.push_back( glm::ivec2( x, y ) );
 			}
 		}
@@ -495,15 +490,15 @@ glm::ivec2 engine::getTile() {
 }
 
 // this pulls the texture data from the accumulator and saves it to a PNG image with a timestamp
-void engine::basicScreenShot() {
+void engine::basicScreenShot () {
 	std::vector< GLfloat > imageAsFloats;
 	imageAsFloats.resize( WIDTH * HEIGHT * 4, 0 );
 
 	// belt and suspenders, what's 100ms between friends?
 	SDL_Delay( 30 );
-	glMemoryBarrier(  GL_ALL_BARRIER_BITS );
+	glMemoryBarrier( GL_ALL_BARRIER_BITS );
 	SDL_Delay( 30 );
-	glMemoryBarrier(  GL_ALL_BARRIER_BITS );
+	glMemoryBarrier( GL_ALL_BARRIER_BITS );
 
 	// get the image data ( floating point accumulator )
 	// glBindTexture( GL_TEXTURE_2D, colorAccumulatorTexture );

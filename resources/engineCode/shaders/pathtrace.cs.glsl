@@ -438,7 +438,7 @@ vec3 colorSample ( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 				// ray refracts, instead of bouncing
 				// for now, perfect reflector with small attenuation
 				rayDirection = reflectedVector;
-				throughput *= 0.9f;
+				throughput *= 0.7f;
 
 				// flip the sign to invert the lens material distance estimate, because the ray is either entering or leaving a refractive medium
 				// refractState = -1.0 * refractState;

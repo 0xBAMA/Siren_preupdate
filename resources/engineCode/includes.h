@@ -105,7 +105,7 @@ struct hostParameters {
 	int fullscreenPasses = 0;						// how many times have we exhausted the tile vector
 
 	int tilePerFrameCap = 128;						// max number of tiles allowed to be executed in a frame update
-	int tileSizeUpdated = true;						// (re)builds the tile list
+	bool tileSizeUpdated = true;					// (re)builds the tile list
 	int tileSize = 512;								// size of one rendering tile ( square )
 
 	// this stuff is still WIP
