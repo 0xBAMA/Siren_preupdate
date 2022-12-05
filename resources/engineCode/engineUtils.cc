@@ -146,11 +146,24 @@ void engine::pathtraceUniformUpdate() {
 	glUniform3f( glGetUniformLocation( pathtraceShader, "metallicDiffuse" ), scene.metallicDiffuse.x, scene.metallicDiffuse.y, scene.metallicDiffuse.z );
 }
 
+void engine::postprocessUniformUpdate () {
+	// all postprocess parameters
+	glUniform1i( glGetUniformLocation( postprocessShader, "ditherMode" ), post.ditherMode );
+	glUniform1i( glGetUniformLocation( postprocessShader, "ditherMethod" ), post.ditherMethod );
+	glUniform1i( glGetUniformLocation( postprocessShader, "ditherPattern" ), post.ditherPattern );
+	glUniform1i( glGetUniformLocation( postprocessShader, "tonemapMode" ), post.tonemapMode );
+	glUniform1i( glGetUniformLocation( postprocessShader, "depthMode" ), post.depthMode );
+	glUniform1f( glGetUniformLocation( postprocessShader, "depthScale" ), post.depthScale );
+	glUniform1f( glGetUniformLocation( postprocessShader, "gamma" ), post.gamma );
+	glUniform1i( glGetUniformLocation( postprocessShader, "displayType" ), post.displayType );
+}
+
 void engine::postprocess () {
 	// tonemapping and dithering, as configured in the GUI
 	glUseProgram( postprocessShader );
 
 	// send associated uniforms
+	postprocessUniformUpdate();
 
 	glDispatchCompute( std::ceil( WIDTH / 32 ), std::ceil( HEIGHT / 32 ), 1 );
 	glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT ); // sync

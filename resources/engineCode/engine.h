@@ -37,6 +37,7 @@ private:
 	void handleEvents();
 	void updateNoiseOffsets();
 	void pathtraceUniformUpdate();
+	void postprocessUniformUpdate();
 	void clear();
 	void imguiPass();
 	void imguiFrameStart();
