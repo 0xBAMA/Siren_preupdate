@@ -100,7 +100,7 @@ using json = nlohmann::json;
 enum class renderMode { previewColor, previewNormal, previewDepth, pathtrace };
 struct hostParameters {
 	bool rendererRequiresUpdate = true;				// has the viewer moved since the screen has updated?
-	renderMode currentMode = renderMode::previewNormal;	// how should we render the scene?
+	renderMode currentMode = renderMode::previewColor; // how should we render the scene?
 	int performanceHistory = 250;					// how many datapoints to keep for tile count / fps
 	int fullscreenPasses = 0;						// how many times have we exhausted the tile vector
 
@@ -144,6 +144,8 @@ struct lensParameters {
 struct sceneParameters {
 	glm::vec3 redWallColor		= glm::vec3( 1.0f, 0.0f, 0.0f );
 	glm::vec3 greenWallColor	= glm::vec3( 0.0f, 1.0f, 0.0f );
+	glm::vec3 whiteWallColor	= glm::vec3( 0.618f );
+	glm::vec3 floorCielingColor	= glm::vec3( 0.9f );
 	glm::vec3 metallicDiffuse	= glm::vec3( 0.618f, 0.362f, 0.04f );
 };
 

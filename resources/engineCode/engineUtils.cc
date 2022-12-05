@@ -141,6 +141,8 @@ void engine::pathtraceUniformUpdate() {
 	// scene
 	glUniform3f( glGetUniformLocation( pathtraceShader, "redWallColor" ), scene.redWallColor.x, scene.redWallColor.y, scene.redWallColor.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "greenWallColor" ), scene.greenWallColor.x, scene.greenWallColor.y, scene.greenWallColor.z );
+	glUniform3f( glGetUniformLocation( pathtraceShader, "whiteWallColor" ), scene.whiteWallColor.x, scene.whiteWallColor.y, scene.whiteWallColor.z );
+	glUniform3f( glGetUniformLocation( pathtraceShader, "floorCielingColor" ), scene.floorCielingColor.x, scene.floorCielingColor.y, scene.floorCielingColor.z );
 	glUniform3f( glGetUniformLocation( pathtraceShader, "metallicDiffuse" ), scene.metallicDiffuse.x, scene.metallicDiffuse.y, scene.metallicDiffuse.z );
 }
 
@@ -279,9 +281,11 @@ void engine::imguiPass () {
 			ImGui::SliderFloat( "Lens Rotation", &lens.lensRotate, -35.0f, 35.0f ); UPDATECHECK;
 			ImGui::SliderFloat( "Lens IOR", &lens.lensIOR, 0.0f, 2.0f );
 			ImGui::Separator();
-			ImGui::ColorEdit3( "Red Wall Color", ( float * ) &scene.redWallColor, ImGuiColorEditFlags_PickerHueWheel ); UPDATECHECK;
-			ImGui::ColorEdit3( "Green Wall Color", ( float * ) &scene.greenWallColor, ImGuiColorEditFlags_PickerHueWheel ); UPDATECHECK;
-			ImGui::ColorEdit3( "Metallic Diffuse", ( float * ) &scene.metallicDiffuse, ImGuiColorEditFlags_PickerHueWheel ); UPDATECHECK;
+			ImGui::ColorEdit3( "Red Wall Color", ( float * ) &scene.redWallColor, ImGuiColorEditFlags_PickerHueWheel );
+			ImGui::ColorEdit3( "Green Wall Color", ( float * ) &scene.greenWallColor, ImGuiColorEditFlags_PickerHueWheel );
+			ImGui::ColorEdit3( "White Walls Color", ( float * ) &scene.whiteWallColor, ImGuiColorEditFlags_PickerHueWheel );
+			ImGui::ColorEdit3( "Floor/Cieling Color", ( float * ) &scene.floorCielingColor, ImGuiColorEditFlags_PickerHueWheel );
+			ImGui::ColorEdit3( "Metallic Diffuse", ( float * ) &scene.metallicDiffuse, ImGuiColorEditFlags_PickerHueWheel );
 			ImGui::Separator();
 			ImGui::EndTabItem();
 		}

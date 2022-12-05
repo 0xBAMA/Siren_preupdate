@@ -33,7 +33,7 @@ uniform int		modeSelect;			// do we do a pathtrace sample, or just the preview
 #define PREVIEW_DIFFUSE	1
 #define PREVIEW_NORMAL	2
 #define PREVIEW_DEPTH	3
-#define PREVIEW_SHADED	4
+#define PREVIEW_SHADED	4 // TODO: some basic phong + AO... tbd
 
 // lens parameters
 uniform float lensScaleFactor;		// scales the lens DE
@@ -46,6 +46,8 @@ uniform float lensIOR;				// index of refraction for the lens
 // scene parameters
 uniform vec3 redWallColor;
 uniform vec3 greenWallColor;
+uniform vec3 whiteWallColor;
+uniform vec3 floorCielingColor;
 uniform vec3 metallicDiffuse;
 
 // global state
@@ -266,11 +268,10 @@ float de ( vec3 p ) {
 	}
 
 	// white walls ( front and back )
-	// float dWhiteWalls = min( dePlane( p, vec3( 0.0f, 0.0f, 1.0f ), 20.0f ),  dePlane( p, vec3( 0.0f, 0.0f, -1.0f ), 20.0f ) );
-	float dWhiteWalls = dePlane( p, vec3( 0.0f, 0.0f, 1.0f ), 16.0f ); // back only
+	float dWhiteWalls = min( dePlane( p, vec3( 0.0f, 0.0f, 1.0f ), 20.0f ),  dePlane( p, vec3( 0.0f, 0.0f, -1.0f ), 20.0f ) );
 	sceneDist = min( dWhiteWalls, sceneDist );
 	if ( sceneDist == dWhiteWalls && dWhiteWalls <= epsilon ) {
-		hitpointColor = vec3( 0.78f );
+		hitpointColor = whiteWallColor;
 		hitpointSurfaceType = DIFFUSE;
 	}
 
@@ -294,7 +295,7 @@ float de ( vec3 p ) {
 	float dFloorCieling = min( dePlane( p, vec3( 0.0f, -1.0f, 0.0f ), 10.0f ), dePlane( p, vec3( 0.0f, 1.0f, 0.0f ), 7.5f ) );
 	sceneDist = min( dFloorCieling, sceneDist );
 	if ( sceneDist == dFloorCieling && dFloorCieling <= epsilon ) {
-		hitpointColor = vec3( 0.9f );
+		hitpointColor = floorCielingColor;
 		hitpointSurfaceType = DIFFUSE;
 	}
 
@@ -372,7 +373,7 @@ vec3 colorSample ( vec3 rayOrigin_in, vec3 rayDirection_in ) {
 	vec3 finalColor = vec3( 0.0f );
 	vec3 throughput = vec3( 1.0f );
 
-	// bump origin up by unit vector - creates section plane
+	// bump origin up by unit vector - creates fuzzy / soft section plane
 	rayOrigin += rayDirection * ( 0.9f + 0.1f * blueNoiseReference( location ).x );
 
 	// debug output
